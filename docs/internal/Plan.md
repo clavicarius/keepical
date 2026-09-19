@@ -1,8 +1,6 @@
 # Loss-minimizing ICS editor (Keepical) — architecture and implementation plan
 
-_Archived plan version. The active documentation lives in the wiki: [Home](Home.md)._
-
-## Guiding principle
+_Archived plan version. The active public documentation lives in the wiki: [Home](../wiki/Home.md)._
 
 No full roundtrip through a calendar library. Every component is stored twice: as
 `rawLines` (untouched) and as `parsed` (interpreted). On export, the rule is:
@@ -41,11 +39,11 @@ keepical/
 
 ## Data model
 
-See [Architecture](Architecture.md) and `src/model/types.ts`.
+See [Architecture](../wiki/Architecture.md) and `src/model/types.ts`.
 
 ## Critical parser rules
 
-See [Parser](Parser.md). In short:
+See [Parser](../wiki/Parser.md). In short:
 
 - Line endings: CRLF/LF/CR on import, CRLF on export.
 - Unfolding: continuation with space/tab; remove exactly one leading character.
@@ -55,15 +53,15 @@ See [Parser](Parser.md). In short:
 
 ## Export strategy
 
-See [Architecture](Architecture.md) (Mermaid) and [Export & Validation](Export-and-Validation.md).
+See [Architecture](../wiki/Architecture.md) (Mermaid) and [Export & Validation](../wiki/Export-and-Validation.md).
 
 ## Validation & report
 
-See [Export & Validation](Export-and-Validation.md).
+See [Export & Validation](../wiki/Export-and-Validation.md).
 
 ## UI building blocks
 
-See [UI](UI.md). Planned: `event-list`, `event-editor`, `rrule-editor`,
+See [UI](../wiki/UI.md). Planned: `event-list`, `event-editor`, `rrule-editor`,
 `export-report` as standalone custom elements.
 
 ## Event behavior
@@ -74,15 +72,15 @@ See [UI](UI.md). Planned: `event-list`, `event-editor`, `rrule-editor`,
 
 ## Test strategy
 
-See [Testing](Testing.md).
+See [Testing](../wiki/Testing.md).
 
 **Core acceptance criterion:** If only the title changes, all other properties of
 that event and of all other VEVENTs remain as byte-identical as possible.
 
 ## Deployment
 
-See [Deployment](Deployment.md).
+See [Deployment](../wiki/Deployment.md).
 
 ## Implementation order
 
-See [Roadmap](Roadmap.md). Phases 1–2 come first as the hard milestone.
+See [Roadmap](../wiki/Roadmap.md). Phases 1–2 come first as the hard milestone.

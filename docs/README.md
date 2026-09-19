@@ -1,5 +1,8 @@
 # Keepical Documentation
 
-Entry point: **[Home](Home.md)**
+This directory holds the repository documentation layout.
 
-This directory is the project's code wiki. See `_Sidebar.md` for navigation.
+- Public wiki source: **[wiki](wiki/Home.md)**
+- Internal notes: **[internal](internal/README.md)**
+
+The GitHub Wiki is synced only from `docs/wiki/**`. Contents outside that folder are not published.

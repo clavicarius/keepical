@@ -1,6 +1,8 @@
 # Keepical — Edit what matters. Keep the rest.
 
-Live version (GitHub Pages): https://clavicarius.github.io/keepical/
+- [Hosted app (GitHub Pages)](https://clavicarius.github.io/keepical/)
+- [GitHub Wiki](https://github.com/clavicarius/keepical/wiki)
+
 
 **Keepical** is a static, fully client-side web app for **loss-minimizing** editing of
 `.ics` files (iCalendar). The core idea is that the app does **not** transform the
@@ -11,7 +13,7 @@ Instead, every component is stored twice — as **original lines** (`rawLines`) 
 > **Core promise:** If you only change an event title, all other properties of that
 > event **and** all other `VEVENT`s remain as byte-identical as possible.
 
-![logo](./src/assets/keepical-applogo.png)
+![logo](./docs/wiki/assets/keepical-applogo.png)
 
 ## Name
 
@@ -63,15 +65,11 @@ If either step fails, the commit is aborted. Emergency exit: `git commit --no-ve
 
 ## Documentation
 
-The code wiki lives under [`docs/`](docs/Home.md):
+Public documentation is the single source of truth under https://github.com/clavicarius/keepical/wiki
+The GitHub Wiki is synchronized only from `docs/wiki/**` via the workflow in [`.github/workflows/wiki.yml`](.github/workflows/wiki.yml).
 
-- [Home](docs/Home.md) — entry point
-- [Plan](docs/Plan.md) — archived architecture and implementation plan
-- [Architecture](docs/Architecture.md) · [Parser](docs/Parser.md) · [Export](docs/Export-and-Validation.md)
-- [UI](docs/UI.md) · [Testing](docs/Testing.md) · [Roadmap](docs/Roadmap.md) · [Deployment](docs/Deployment.md) · [Versioning](docs/VERSIONING.md)
+Internal or non-public notes belong in [`docs/internal/`](docs/internal/README.md), including the archived plan and local setup notes. 
 
-GitHub wiki compatibility: [`docs/_Sidebar.md`](docs/_Sidebar.md) can be copied into
-the GitHub wiki as-is.
 
 ## Architecture (short overview)
 
@@ -82,13 +80,13 @@ src/
   export/    Folding, raw-vs-patch serialization
   validate/  Structural checks + export report/diff
   ui/        Web Components (list, editor, RRULE, report)
-docs/        Code wiki (see above)
+docs/        Repository docs; public wiki source is docs/wiki/
 ```
 
 ## Status
 
 Early stage. Order: parser + lossless roundtrip (milestone) → editing → recurrence →
-validation/diff → deployment (GitHub Pages). See [Roadmap](docs/Roadmap.md) and the
+validation/diff → deployment (GitHub Pages). See [Roadmap](docs/wiki/Roadmap.md) and the
 GitHub issues for the individual phases.
 
 ## License

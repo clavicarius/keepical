@@ -1,9 +1,9 @@
 # Project setup, GitHub issues, and deployment
 
-The product documentation and plan live in the code wiki under [`docs/`](docs/Home.md).
-This document only contains the manual steps that could not be executed automatically
-in this environment (the sandbox blocks terminal commands such as `git`, `gh`, and
-`npm`). All source files have already been created.
+The public project documentation lives under [`docs/wiki/`](../wiki/Home.md).
+This document is intentionally internal and contains manual setup steps that do not
+belong in the public GitHub Wiki. The sandbox blocks terminal commands such as
+`git`, `gh`, and `npm`, so these instructions remain as repo-local maintainer notes.
 
 ## 1. Install dependencies and run tests
 

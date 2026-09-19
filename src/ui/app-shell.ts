@@ -152,6 +152,9 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
           <span class="file-name">${hasModel ? escapeHtml(this.fileName) : "No file open"}</span>
         </div>
         <div class="statusbar-meta">
+          <div class="statusbar-group statusbar-link">
+            <a href="https://github.com/clavicarius/keepical/wiki" target="_blank" rel="noopener noreferrer">Wiki</a>
+          </div>
           <div class="statusbar-group statusbar-version">
             <span class="file-label">Version:</span>
             <span>${escapeHtml(appVersion)}</span>

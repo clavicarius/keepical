@@ -73,6 +73,12 @@ keepical-app {
 .statusbar .file-label { color: var(--muted); }
 .statusbar .file-name { font-weight: 600; }
 .statusbar-version { white-space: nowrap; }
+.statusbar-link a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.statusbar-link a:hover { text-decoration: underline; }
 
 button {
   font: inherit; padding: 0.4rem 0.8rem;

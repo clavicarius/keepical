@@ -1,17 +1,30 @@
 # Keepical — Wiki
 
-Welcome to the code wiki for **Keepical**: a static, fully client-side web app for
-loss-minimizing editing of `.ics` files without losing unknown properties,
-`VTIMEZONE`, `VALARM`, or HTML content during roundtrips.
+Welcome to the code wiki for **Keepical**.
+
+Keepical = keep + iCal. Edit without rewriting the calendar unnecessarily.
 
 > **Core promise:** If you only change an event title, all other properties of that
 > event **and** all other `VEVENT`s remain as byte-identical as possible.
+
+![logo](./assets/keepical-applogo.png)
+
+**Keepical** is a static, fully client-side web app for **loss-minimizing** editing of
+`.ics` files (iCalendar). The core idea is that the app does **not** transform the
+calendar into a simplified internal model and then serialize it from scratch.
+Instead, every component is stored twice — as **original lines** (`rawLines`) and as
+**interpreted data** (`parsed`).
+
+## Live links
+
+- [Hosted app (GitHub Pages)](https://clavicarius.github.io/keepical/)
+- [GitHub Wiki](https://github.com/clavicarius/keepical/wiki)
+
 
 ## Navigation
 
 | Page | Content |
 | --- | --- |
-| [Plan](Plan.md) | Archived architecture and implementation plan |
 | [Architecture](Architecture.md) | Guiding principle (raw/patch), data model, export strategy |
 | [Parser](Parser.md) | Unfolding, content-line split, component tree, VEVENT interpretation |
 | [Export & Validation](Export-and-Validation.md) | Folding, patch serializer, validation, export report |

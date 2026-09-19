@@ -28,4 +28,19 @@ describe("workflow configuration", () => {
     expect(versioningWorkflow).toContain("uses: ./.github/workflows/deploy.yml");
     expect(versioningWorkflow).toContain("needs.version.outputs.published == 'true'");
   });
+
+  it("wiki workflow syncs only docs/wiki to the GitHub wiki and supports manual runs", () => {
+    const wikiWorkflow = readFileSync(
+      new URL("../.github/workflows/wiki.yml", import.meta.url),
+      "utf8",
+    );
+
+    expect(wikiWorkflow).toContain("name: Sync documentation to Wiki");
+    expect(wikiWorkflow).toContain("workflow_dispatch:");
+    expect(wikiWorkflow).toContain("docs/wiki/**");
+    expect(wikiWorkflow).toContain("path: docs/wiki/");
+    expect(wikiWorkflow).toContain("uses: Andrew-Chen-Wang/github-wiki-action@v5");
+    expect(wikiWorkflow).toMatch(/concurrency:\r?\n\s*group: wiki-sync/);
+    expect(wikiWorkflow).toMatch(/permissions:\r?\n\s*contents: write/);
+  });
 });

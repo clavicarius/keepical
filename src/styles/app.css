@@ -169,6 +169,11 @@ input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+#e-rrule {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
 
 details { margin-top: 0.75rem; }

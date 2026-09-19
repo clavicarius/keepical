@@ -88,6 +88,15 @@ export function setEventProperty(
   event.changedProperties.add(name);
 }
 
+/** Remove all properties of a given name from an event and mark it changed. */
+export function removeEventProperty(event: VEvent, name: string): void {
+  const next = event.component.properties.filter((p) => p.name !== name);
+  if (next.length === event.component.properties.length) return;
+  event.component.properties = next;
+  event.component.dirty = true;
+  event.changedProperties.add(name);
+}
+
 /** Mark an event deleted (its VEVENT block is dropped on export). */
 export function deleteEvent(event: VEvent): void {
   event.isDeleted = true;

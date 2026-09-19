@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { SAMPLE_ICS } from "./fixtures/sample.js";
 import { parseIcs } from "../src/parser/index.js";
 import { serializeCalendar } from "../src/export/index.js";
-import { setEventProperty, addEvent, deleteEvent } from "../src/model/calendar.js";
+import { renderContentLine } from "../src/export/serialize.js";
+import { parseContentLine } from "../src/parser/contentline.js";
+import { setEventProperty, setEventProperties, addEvent, deleteEvent } from "../src/model/calendar.js";
 import { encodeIcalText } from "../src/parser/text.js";
 
 function roundtrip(input: string): string {
@@ -110,5 +112,34 @@ describe("selective editing", () => {
 
     const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
     expect(out).toContain("DESCRIPTION:Zeile 1\\nZeile 2");
+  });
+
+  it("edits EXDATE while keeping existing parameters and allowing multiple lines", () => {
+    const model = parseIcs(SAMPLE_ICS);
+    const target = model.events.find((e) => e.parsed.uid === "weekly-0003@example.org")!;
+    const existing = target.component.properties.find((p) => p.name === "EXDATE")!;
+    const edited = renderContentLine(existing).replace("20260119T180000", "20260120T180000");
+    setEventProperties(target, "EXDATE", [
+      parseContentLine(edited, []),
+      parseContentLine("EXDATE;VALUE=DATE:20260126", []),
+    ]);
+
+    const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
+    expect(out).toContain("EXDATE;TZID=Europe/Berlin:20260120T180000");
+    expect(out).toContain("EXDATE;VALUE=DATE:20260126");
+  });
+
+  it("edits RDATE with multi-values without changing untouched EXDATE", () => {
+    const model = parseIcs(SAMPLE_ICS);
+    const target = model.events.find((e) => e.parsed.uid === "weekly-0003@example.org")!;
+    setEventProperties(target, "RDATE", [
+      parseContentLine("RDATE;TZID=Europe/Berlin:20260113T180000,20260127T180000", []),
+      parseContentLine("RDATE;VALUE=DATE:20260202", []),
+    ]);
+
+    const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
+    expect(out).toContain("RDATE;TZID=Europe/Berlin:20260113T180000,20260127T180000");
+    expect(out).toContain("RDATE;VALUE=DATE:20260202");
+    expect(out).toContain("EXDATE;TZID=Europe/Berlin:20260119T180000");
   });
 });

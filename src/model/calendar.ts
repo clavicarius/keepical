@@ -88,6 +88,27 @@ export function setEventProperty(
   event.changedProperties.add(name);
 }
 
+/** Replace all properties of a given name, preserving the surrounding order. */
+export function setEventProperties(
+  event: VEvent,
+  name: string,
+  properties: ContentLine[],
+): void {
+  const props = event.component.properties;
+  const firstIndex = props.findIndex((p) => p.name === name);
+  const preserved = props.filter((p) => p.name !== name);
+  const next = properties.map((p) => ({
+    ...p,
+    name,
+    rawLines: [],
+  }));
+  if (firstIndex >= 0) preserved.splice(firstIndex, 0, ...next);
+  else preserved.push(...next);
+  event.component.properties = preserved;
+  event.component.dirty = true;
+  event.changedProperties.add(name);
+}
+
 /** Mark an event deleted (its VEVENT block is dropped on export). */
 export function deleteEvent(event: VEvent): void {
   event.isDeleted = true;

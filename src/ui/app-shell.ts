@@ -16,7 +16,7 @@ import { buildReport, validate } from "../validate/validator.js";
 import {
   addEvent,
   deleteEvent,
-  setEventProperties,
+  setEventPropertiesScoped,
   removeEventProperty,
   setEventProperty,
   getEventSeries,
@@ -285,17 +285,17 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
   ${renderRRuleEditor(p.rrule[0] ?? "")}
         <div class="field">
           <label>EXDATE (eine Zeile pro Content-Line)</label>
-          <textarea id="e-exdate" rows="3">${escapeHtml(recurrenceLinesValue(ev, "EXDATE"))}</textarea>
+          <textarea id="e-exdate" rows="3">${escapeHtml(recurrenceLinesValue(target, "EXDATE"))}</textarea>
         </div>
         <div class="field">
           <label>RDATE (eine Zeile pro Content-Line)</label>
-          <textarea id="e-rdate" rows="3">${escapeHtml(recurrenceLinesValue(ev, "RDATE"))}</textarea>
+          <textarea id="e-rdate" rows="3">${escapeHtml(recurrenceLinesValue(target, "RDATE"))}</textarea>
         </div>
       </details>
 
       <details>
-        <summary>Raw data (${ev.component.properties.length} properties)</summary>
-        <pre style="white-space:pre-wrap">${escapeHtml(ev.component.properties.map((x) => x.rawLines.join("\\n") || `${x.name}:${x.value}`).join("\n"))}</pre>
+        <summary>Raw data (${target.component.properties.length} properties)</summary>
+        <pre style="white-space:pre-wrap">${escapeHtml(target.component.properties.map((x) => x.rawLines.join("\\n") || `${x.name}:${x.value}`).join("\n"))}</pre>
       </details>
 
       <div style="display:flex; gap:0.5rem; margin-top:1rem;">
@@ -385,7 +385,7 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
       const after = input.value.replace(/\r\n/g, "\n");
       if (after === before) return;
       const lines = parseRecurrenceLines(name, after);
-      setEventProperties(target, name, lines);
+      setEventPropertiesScoped(this.model!, ev, name, lines, scope);
       if (name === "EXDATE") target.parsed.exdate = lines.map((line) => line.value);
       if (name === "RDATE") target.parsed.rdate = lines.map((line) => line.value);
       this.renderList();

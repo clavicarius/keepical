@@ -7,6 +7,7 @@ import { parseContentLine } from "../src/parser/contentline.js";
 import {
   setEventProperty,
   setEventProperties,
+  setEventPropertiesScoped,
   addEvent,
   deleteEvent,
   getEventSeries,
@@ -248,5 +249,34 @@ describe("RECURRENCE-ID series semantics", () => {
     expect(serializeCalendar(model, { eol: "\r\n", trailingNewline: true })).toContain(
       "RECURRENCE-ID:20260120T180000Z",
     );
+  });
+
+  it("applies EXDATE and RDATE edits to the selected scope only", () => {
+    const model = parseIcs(recurrenceCalendar);
+    const instance = model.events[1];
+
+    setEventPropertiesScoped(
+      model,
+      instance,
+      "EXDATE",
+      [parseContentLine("EXDATE:20260127T180000Z", [])],
+      "series",
+    );
+    setEventPropertiesScoped(
+      model,
+      instance,
+      "RDATE",
+      [parseContentLine("RDATE:20260120T200000Z", [])],
+      "instance",
+    );
+
+    expect(model.events[0].component.properties.find((p) => p.name === "EXDATE")?.value).toBe(
+      "20260127T180000Z",
+    );
+    expect(model.events[0].component.properties.some((p) => p.name === "RDATE")).toBe(false);
+    expect(model.events[1].component.properties.find((p) => p.name === "RDATE")?.value).toBe(
+      "20260120T200000Z",
+    );
+    expect(model.events[1].component.properties.some((p) => p.name === "EXDATE")).toBe(false);
   });
 });

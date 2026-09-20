@@ -208,7 +208,12 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
       ?.scrollIntoView({ block: "nearest", inline: "nearest" });
     const panel = this.querySelector(".editor-panel");
     if (panel instanceof HTMLElement) panel.scrollTop = 0;
-    this.querySelector("#editor")?.scrollIntoView({ block: "nearest" });
+    const editor = this.querySelector("#editor");
+    if (editor instanceof HTMLElement && window.matchMedia("(max-width: 600px)").matches) {
+      window.scrollTo({ top: window.scrollY + editor.getBoundingClientRect().top - 8, left: 0 });
+    } else {
+      editor?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
   }
 
   private renderList(): void {

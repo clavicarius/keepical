@@ -2,8 +2,21 @@ import { describe, it, expect } from "vitest";
 import { SAMPLE_ICS } from "./fixtures/sample.js";
 import { parseIcs } from "../src/parser/index.js";
 import { serializeCalendar } from "../src/export/index.js";
-import { setEventProperty, addEvent, deleteEvent } from "../src/model/calendar.js";
+import { renderContentLine } from "../src/export/serialize.js";
+import { parseContentLine } from "../src/parser/contentline.js";
+import {
+  setEventProperty,
+  setEventProperties,
+  setEventPropertiesScoped,
+  addEvent,
+  deleteEvent,
+  getEventSeries,
+  getSeriesMaster,
+  isRecurrenceInstance,
+  setEventPropertyScoped,
+} from "../src/model/calendar.js";
 import { encodeIcalText } from "../src/parser/text.js";
+import { parseRRule, rruleModelToIcal } from "../src/ui/rrule.js";
 
 function roundtrip(input: string): string {
   const model = parseIcs(input);
@@ -110,5 +123,160 @@ describe("selective editing", () => {
 
     const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
     expect(out).toContain("DESCRIPTION:Zeile 1\\nZeile 2");
+  });
+
+  it("edits EXDATE while keeping existing parameters and allowing multiple lines", () => {
+    const model = parseIcs(SAMPLE_ICS);
+    const target = model.events.find((e) => e.parsed.uid === "weekly-0003@example.org")!;
+    const existing = target.component.properties.find((p) => p.name === "EXDATE")!;
+    const edited = renderContentLine(existing).replace("20260119T180000", "20260120T180000");
+    setEventProperties(target, "EXDATE", [
+      parseContentLine(edited, []),
+      parseContentLine("EXDATE;VALUE=DATE:20260126", []),
+    ]);
+
+    const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
+    expect(out).toContain("EXDATE;TZID=Europe/Berlin:20260120T180000");
+    expect(out).toContain("EXDATE;VALUE=DATE:20260126");
+  });
+
+  it("edits RDATE with multi-values without changing untouched EXDATE", () => {
+    const model = parseIcs(SAMPLE_ICS);
+    const target = model.events.find((e) => e.parsed.uid === "weekly-0003@example.org")!;
+    setEventProperties(target, "RDATE", [
+      parseContentLine("RDATE;TZID=Europe/Berlin:20260113T180000,20260127T180000", []),
+      parseContentLine("RDATE;VALUE=DATE:20260202", []),
+    ]);
+
+    const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
+    expect(out).toContain("RDATE;TZID=Europe/Berlin:20260113T180000,20260127T180000");
+    expect(out).toContain("RDATE;VALUE=DATE:20260202");
+    expect(out).toContain("EXDATE;TZID=Europe/Berlin:20260119T180000");
+  });
+
+  it("preserves unsupported RRULE parts during structured edits", () => {
+    const input = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:rrule@example.org",
+      "DTSTART:20260106T180000Z",
+      "RRULE:FREQ=WEEKLY;BYDAY=MO,WE;WKST=MO",
+      "SUMMARY:Serie",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n");
+    const model = parseIcs(input);
+    const target = model.events[0];
+    const next = rruleModelToIcal(
+      {
+        ...parseRRule(target.parsed.rrule[0] ?? ""),
+        interval: "2",
+      },
+      target.parsed.rrule[0] ?? "",
+    );
+
+    setEventProperty(target, "RRULE", next);
+
+    const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
+    expect(out).toContain("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;WKST=MO");
+  });
+});
+
+describe("RECURRENCE-ID series semantics", () => {
+  const recurrenceCalendar = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "BEGIN:VEVENT",
+    "UID:series@example.org",
+    "DTSTART:20260106T180000Z",
+    "RRULE:FREQ=WEEKLY",
+    "EXDATE:20260113T180000Z",
+    "SUMMARY:Master",
+    "END:VEVENT",
+    "BEGIN:VEVENT",
+    "UID:series@example.org",
+    "RECURRENCE-ID:20260120T180000Z",
+    "DTSTART:20260120T190000Z",
+    "SUMMARY:Ausnahme",
+    "END:VEVENT",
+    "END:VCALENDAR",
+    "",
+  ].join("\r\n");
+
+  it("groups master and overridden instances by UID", () => {
+    const model = parseIcs(recurrenceCalendar);
+    const instance = model.events[1];
+
+    expect(getEventSeries(model, instance)).toHaveLength(2);
+    expect(getSeriesMaster(model, instance)).toBe(model.events[0]);
+    expect(isRecurrenceInstance(model.events[0])).toBe(false);
+    expect(isRecurrenceInstance(instance)).toBe(true);
+  });
+
+  it("edits the master for series scope and preserves the exception", () => {
+    const model = parseIcs(recurrenceCalendar);
+    const instance = model.events[1];
+
+    setEventPropertyScoped(model, instance, "SUMMARY", "Neue Serie", "series");
+
+    expect(model.events[0].parsed.uid).toBe("series@example.org");
+    expect(model.events[0].component.properties.find((p) => p.name === "SUMMARY")?.value).toBe(
+      "Neue Serie",
+    );
+    expect(model.events[1].component.properties.find((p) => p.name === "SUMMARY")?.value).toBe(
+      "Ausnahme",
+    );
+    const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
+    expect(out).toContain("EXDATE:20260113T180000Z");
+    expect(out).toContain("RECURRENCE-ID:20260120T180000Z");
+    expect(out).toContain("SUMMARY:Ausnahme");
+  });
+
+  it("edits only the selected occurrence for instance scope", () => {
+    const model = parseIcs(recurrenceCalendar);
+    const instance = model.events[1];
+
+    setEventPropertyScoped(model, instance, "SUMMARY", "Verschobene Ausnahme", "instance");
+
+    expect(model.events[0].component.properties.find((p) => p.name === "SUMMARY")?.value).toBe(
+      "Master",
+    );
+    expect(model.events[1].component.properties.find((p) => p.name === "SUMMARY")?.value).toBe(
+      "Verschobene Ausnahme",
+    );
+    expect(serializeCalendar(model, { eol: "\r\n", trailingNewline: true })).toContain(
+      "RECURRENCE-ID:20260120T180000Z",
+    );
+  });
+
+  it("applies EXDATE and RDATE edits to the selected scope only", () => {
+    const model = parseIcs(recurrenceCalendar);
+    const instance = model.events[1];
+
+    setEventPropertiesScoped(
+      model,
+      instance,
+      "EXDATE",
+      [parseContentLine("EXDATE:20260127T180000Z", [])],
+      "series",
+    );
+    setEventPropertiesScoped(
+      model,
+      instance,
+      "RDATE",
+      [parseContentLine("RDATE:20260120T200000Z", [])],
+      "instance",
+    );
+
+    expect(model.events[0].component.properties.find((p) => p.name === "EXDATE")?.value).toBe(
+      "20260127T180000Z",
+    );
+    expect(model.events[0].component.properties.some((p) => p.name === "RDATE")).toBe(false);
+    expect(model.events[1].component.properties.find((p) => p.name === "RDATE")?.value).toBe(
+      "20260120T200000Z",
+    );
+    expect(model.events[1].component.properties.some((p) => p.name === "EXDATE")).toBe(false);
   });
 });

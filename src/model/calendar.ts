@@ -22,6 +22,61 @@ export interface NewEventInput {
   tzid?: string;
 }
 
+export type EventEditScope = "series" | "instance";
+
+/** Return all VEVENTs belonging to the selected UID, in calendar order. */
+export function getEventSeries(model: CalendarModel, event: VEvent): VEvent[] {
+  return model.events.filter((candidate) => candidate.parsed.uid === event.parsed.uid);
+}
+
+/** Return the series master, or the event itself when no master is present. */
+export function getSeriesMaster(model: CalendarModel, event: VEvent): VEvent {
+  return (
+    getEventSeries(model, event).find((candidate) => !candidate.parsed.recurrenceId) ?? event
+  );
+}
+
+/** True when the event represents one overridden occurrence of a series. */
+export function isRecurrenceInstance(event: VEvent): boolean {
+  return event.parsed.recurrenceId !== undefined;
+}
+
+/** Resolve the VEVENT that an explicit series/instance edit should change. */
+export function resolveEventEditTarget(
+  model: CalendarModel,
+  event: VEvent,
+  scope: EventEditScope,
+): VEvent {
+  return scope === "series" ? getSeriesMaster(model, event) : event;
+}
+
+/** Apply a property edit to either the whole series or one occurrence. */
+export function setEventPropertyScoped(
+  model: CalendarModel,
+  event: VEvent,
+  name: string,
+  value: string,
+  scope: EventEditScope,
+  parameters?: Record<string, string[]>,
+): VEvent {
+  const target = resolveEventEditTarget(model, event, scope);
+  setEventProperty(target, name, value, parameters);
+  return target;
+}
+
+/** Apply a complete multi-line property edit to either a series or occurrence. */
+export function setEventPropertiesScoped(
+  model: CalendarModel,
+  event: VEvent,
+  name: string,
+  properties: ContentLine[],
+  scope: EventEditScope,
+): VEvent {
+  const target = resolveEventEditTarget(model, event, scope);
+  setEventProperties(target, name, properties);
+  return target;
+}
+
 /** Configurable suffix for generated UIDs (see project rules). */
 export const DEFAULT_UID_SUFFIX = "keepical.local";
 
@@ -84,6 +139,36 @@ export function setEventProperty(
   } else {
     event.component.properties.push(line(name, value, parameters ?? {}));
   }
+  event.component.dirty = true;
+  event.changedProperties.add(name);
+}
+
+/** Replace all properties of a given name, preserving the surrounding order. */
+export function setEventProperties(
+  event: VEvent,
+  name: string,
+  properties: ContentLine[],
+): void {
+  const props = event.component.properties;
+  const firstIndex = props.findIndex((p) => p.name === name);
+  const preserved = props.filter((p) => p.name !== name);
+  const next = properties.map((p) => ({
+    ...p,
+    name,
+    rawLines: [],
+  }));
+  if (firstIndex >= 0) preserved.splice(firstIndex, 0, ...next);
+  else preserved.push(...next);
+  event.component.properties = preserved;
+  event.component.dirty = true;
+  event.changedProperties.add(name);
+}
+
+/** Remove all properties of a given name from an event and mark it changed. */
+export function removeEventProperty(event: VEvent, name: string): void {
+  const next = event.component.properties.filter((p) => p.name !== name);
+  if (next.length === event.component.properties.length) return;
+  event.component.properties = next;
   event.component.dirty = true;
   event.changedProperties.add(name);
 }

@@ -47,6 +47,12 @@ interface VEvent {
 }
 ```
 
+Events with the same `UID` form one recurrence series. The event without
+`RECURRENCE-ID` is the series master; an event with `RECURRENCE-ID` is an
+overridden occurrence. Series edits target only the master, while occurrence
+edits target only the selected exception. Existing exception VEVENTs therefore
+remain losslessly intact when the series is changed.
+
 The `CalendarModel` (`src/model/types.ts`) stores the `VCALENDAR` tree, an index of
 editable events, the line ending detected during import (`originalEol`), and whether
 the file ended with a trailing line break.
@@ -98,6 +104,8 @@ See `src/model/calendar.ts`.
 - **New:** `UID:<uuid>@keepical.local` (suffix configurable via
   `DEFAULT_UID_SUFFIX`), minimum fields UID/DTSTAMP/DTSTART/DTEND|DURATION/SUMMARY.
 - **Deleted:** the entire `VEVENT` block is removed and nothing else.
+- **Recurrence instance:** `RECURRENCE-ID` identifies the occurrence being
+  overridden; it is never removed as a side effect of editing the series.
 
 ## Technical stack
 

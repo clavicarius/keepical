@@ -27,6 +27,7 @@
 * { box-sizing: border-box; }
 
 body { margin: 0; background: var(--bg); color: var(--text); overflow: hidden; }
+html { overflow-x: clip; }
 
 keepical-app {
   display: flex;
@@ -92,13 +93,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.2fr);
   gap: 1rem; padding: 1rem; align-items: stretch;
-  flex: 1; min-height: 0;
+  flex: 1; min-width: 0; min-height: 0;
 }
 
 .panel {
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 10px; padding: 1rem;
-  display: flex; flex-direction: column; min-height: 0;
+  display: flex; flex-direction: column; min-width: 0; min-height: 0;
 }
 
 .editor-panel { overflow-y: auto; gap: 1rem; }
@@ -260,6 +261,7 @@ summary { cursor: pointer; font-weight: 600; }
 @media (max-width: 600px) {
   body {
     overflow-y: auto;
+    overflow-x: clip;
   }
 
   keepical-app {

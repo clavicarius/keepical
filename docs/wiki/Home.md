@@ -7,7 +7,7 @@ Keepical = keep + iCal. Edit without rewriting the calendar unnecessarily.
 > **Core promise:** If you only change an event title, all other properties of that
 > event **and** all other `VEVENT`s remain as byte-identical as possible.
 
-![logo](./assets/keepical-applogo.png)
+![logo](https://raw.githubusercontent.com/wiki/clavicarius/keepical/assets/keepical-applogo.png)
 
 **Keepical** is a static, fully client-side web app for **loss-minimizing** editing of
 `.ics` files (iCalendar). The core idea is that the app does **not** transform the

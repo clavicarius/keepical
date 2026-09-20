@@ -29,6 +29,7 @@ Instead, every component is stored twice — as **original lines** (`rawLines`) 
 | [Parser](Parser.md) | Unfolding, content-line split, component tree, VEVENT interpretation |
 | [Export & Validation](Export-and-Validation.md) | Folding, patch serializer, validation, export report |
 | [UI](UI.md) | Web Components structure, list, editor, RRULE, report |
+| [Decision records](Decision-Records.md) | Small implementation decisions that affect editor behavior |
 | [Testing](Testing.md) | Fixtures, roundtrip tests, acceptance criteria |
 | [Roadmap](Roadmap.md) | Development phases 1–6 and status |
 | [Deployment](Deployment.md) | GitHub Pages, Actions workflow, setup commands |

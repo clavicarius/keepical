@@ -6,6 +6,7 @@ import { renderContentLine } from "../src/export/serialize.js";
 import { parseContentLine } from "../src/parser/contentline.js";
 import { setEventProperty, setEventProperties, addEvent, deleteEvent } from "../src/model/calendar.js";
 import { encodeIcalText } from "../src/parser/text.js";
+import { parseRRule, rruleModelToIcal } from "../src/ui/rrule.js";
 
 function roundtrip(input: string): string {
   const model = parseIcs(input);
@@ -141,5 +142,34 @@ describe("selective editing", () => {
     expect(out).toContain("RDATE;TZID=Europe/Berlin:20260113T180000,20260127T180000");
     expect(out).toContain("RDATE;VALUE=DATE:20260202");
     expect(out).toContain("EXDATE;TZID=Europe/Berlin:20260119T180000");
+  });
+
+  it("preserves unsupported RRULE parts during structured edits", () => {
+    const input = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:rrule@example.org",
+      "DTSTART:20260106T180000Z",
+      "RRULE:FREQ=WEEKLY;BYDAY=MO,WE;WKST=MO",
+      "SUMMARY:Serie",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n");
+    const model = parseIcs(input);
+    const target = model.events[0];
+    const next = rruleModelToIcal(
+      {
+        ...parseRRule(target.parsed.rrule[0] ?? ""),
+        interval: "2",
+      },
+      target.parsed.rrule[0] ?? "",
+    );
+
+    setEventProperty(target, "RRULE", next);
+
+    const out = serializeCalendar(model, { eol: "\r\n", trailingNewline: true });
+    expect(out).toContain("RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;WKST=MO");
   });
 });

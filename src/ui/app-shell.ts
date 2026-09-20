@@ -13,8 +13,16 @@ import { encodeIcalText } from "../parser/text.js";
 import { serializeCalendar } from "../export/index.js";
 import { renderContentLine } from "../export/serialize.js";
 import { buildReport, validate } from "../validate/validator.js";
-import { addEvent, deleteEvent, setEventProperties, setEventProperty, DEFAULT_UID_SUFFIX } from "../model/calendar.js";
+import {
+  addEvent,
+  deleteEvent,
+  setEventProperties,
+  removeEventProperty,
+  setEventProperty,
+  DEFAULT_UID_SUFFIX,
+} from "../model/calendar.js";
 import { icalToPickerValue, pickerToIcal } from "./datetime.js";
+import { parseRRule, rruleModelToIcal } from "./rrule.js";
 import logoUrl from "../assets/keepical-logo.png";
 
 const appVersion = __APP_VERSION__;
@@ -253,7 +261,7 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
 
       <details ${p.rrule.length ? "open" : ""}>
         <summary>Recurrence / exceptions</summary>
-        <div class="field"><label>RRULE (raw)</label><input id="e-rrule" value="${escapeHtml(p.rrule[0] ?? "")}" /></div>
+  ${renderRRuleEditor(p.rrule[0] ?? "")}
         <div class="field">
           <label>EXDATE (eine Zeile pro Content-Line)</label>
           <textarea id="e-exdate" rows="3">${escapeHtml(recurrenceLinesValue(ev, "EXDATE"))}</textarea>
@@ -296,6 +304,7 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
     on("#e-rrule", "RRULE");
     this.bindRecurrenceListField(ev, "EXDATE");
     this.bindRecurrenceListField(ev, "RDATE");
+    this.bindRRuleFields(ev);
 
     this.bindDateTimeField(ev, "dtstart", "DTSTART");
     this.bindDateTimeField(ev, "dtend", "DTEND");
@@ -344,6 +353,59 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
       this.renderList();
       this.renderEditor();
     });
+  }
+
+  private bindRRuleFields(ev: VEvent): void {
+    const rawInput = this.querySelector<HTMLTextAreaElement>("#e-rrule");
+    if (!rawInput) return;
+
+    const applyRaw = (value: string): void => {
+      const trimmed = value.trim();
+      if (trimmed) {
+        setEventProperty(ev, "RRULE", trimmed);
+        ev.parsed.rrule = [trimmed];
+      } else {
+        removeEventProperty(ev, "RRULE");
+        ev.parsed.rrule = [];
+      }
+      this.renderList();
+      this.renderEditor();
+    };
+
+    rawInput.addEventListener("change", () => applyRaw(rawInput.value));
+
+    const syncStructured = () => {
+      const currentRaw = rawInput.value.trim();
+      const current = parseRRule(currentRaw);
+      const next = rruleModelToIcal(
+        {
+          freq: this.querySelector<HTMLSelectElement>("#rrule-freq")?.value ?? "",
+          interval: this.querySelector<HTMLInputElement>("#rrule-interval")?.value ?? "",
+          count: this.querySelector<HTMLInputElement>("#rrule-count")?.value ?? "",
+          until: this.querySelector<HTMLInputElement>("#rrule-until")?.value ?? "",
+          byday: this.querySelector<HTMLInputElement>("#rrule-byday")?.value ?? "",
+          bymonthday: this.querySelector<HTMLInputElement>("#rrule-bymonthday")?.value ?? "",
+          bysetpos: this.querySelector<HTMLInputElement>("#rrule-bysetpos")?.value ?? "",
+          unsupportedParts: current.unsupportedParts,
+        },
+        currentRaw,
+      );
+      if (next === currentRaw) return;
+      rawInput.value = next;
+      applyRaw(next);
+    };
+
+    for (const id of [
+      "#rrule-freq",
+      "#rrule-interval",
+      "#rrule-count",
+      "#rrule-until",
+      "#rrule-byday",
+      "#rrule-bymonthday",
+      "#rrule-bysetpos",
+    ]) {
+      this.querySelector<HTMLInputElement | HTMLSelectElement>(id)?.addEventListener("change", syncStructured);
+    }
   }
 
   private onAdd(): void {
@@ -406,6 +468,68 @@ function parseRecurrenceLines(name: "EXDATE" | "RDATE", input: string) {
       parsed.rawLines = [];
       return parsed;
     });
+}
+
+function renderRRuleEditor(raw: string): string {
+  const model = parseRRule(raw);
+  return `
+    <div class="row2">
+      <div class="field">
+        <label>FREQ</label>
+        <select id="rrule-freq">
+          ${renderRRuleFreqOption("", model.freq, "—")}
+          ${renderRRuleFreqOption("DAILY", model.freq)}
+          ${renderRRuleFreqOption("WEEKLY", model.freq)}
+          ${renderRRuleFreqOption("MONTHLY", model.freq)}
+          ${renderRRuleFreqOption("YEARLY", model.freq)}
+          ${renderRRuleFreqOption("HOURLY", model.freq)}
+          ${renderRRuleFreqOption("MINUTELY", model.freq)}
+          ${renderRRuleFreqOption("SECONDLY", model.freq)}
+        </select>
+      </div>
+      <div class="field">
+        <label>INTERVAL</label>
+        <input id="rrule-interval" type="number" min="1" step="1" value="${escapeHtml(model.interval)}" />
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>COUNT</label>
+        <input id="rrule-count" type="number" min="1" step="1" value="${escapeHtml(model.count)}" />
+      </div>
+      <div class="field">
+        <label>UNTIL</label>
+        <input id="rrule-until" value="${escapeHtml(model.until)}" placeholder="20260331T215959Z" />
+      </div>
+    </div>
+    <div class="field">
+      <label>BYDAY</label>
+      <input id="rrule-byday" value="${escapeHtml(model.byday)}" placeholder="MO,WE or -1SU" />
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>BYMONTHDAY</label>
+        <input id="rrule-bymonthday" value="${escapeHtml(model.bymonthday)}" placeholder="1,15,-1" />
+      </div>
+      <div class="field">
+        <label>BYSETPOS</label>
+        <input id="rrule-bysetpos" value="${escapeHtml(model.bysetpos)}" placeholder="1,-1" />
+      </div>
+    </div>
+    ${
+      model.unsupportedParts.length
+        ? `<div class="field"><div class="raw-value">Unsupported RRULE parts stay in raw text and are preserved on export: ${escapeHtml(model.unsupportedParts.join("; "))}</div></div>`
+        : ""
+    }
+    <div class="field">
+      <label>RRULE (raw)</label>
+      <textarea id="e-rrule" rows="3">${escapeHtml(raw)}</textarea>
+    </div>
+  `;
+}
+
+function renderRRuleFreqOption(value: string, selected: string, label: string = value): string {
+  return `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`;
 }
 
 function escapeHtml(s: string): string {

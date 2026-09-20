@@ -23,8 +23,9 @@ Filters: search (title/location), changed only, recurring only, events with alar
 ## Editing form
 
 Standard fields: SUMMARY, DTSTART, DTEND, LOCATION, DESCRIPTION. Advanced sections
-(collapsible): RRULE (raw) and EXDATE, plus a raw-data view of all properties. The
-UID is shown as **read-only**.
+(collapsible): a hybrid RRULE editor (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`,
+`BYDAY`, `BYMONTHDAY`, `BYSETPOS`) with always-visible raw fallback, EXDATE, plus
+a raw-data view of all properties. The UID is shown as **read-only**.
 
 Changes go through `setEventProperty()` (`src/model/calendar.ts`), which marks the
 affected property in `changedProperties` and sets the component to `dirty` — the

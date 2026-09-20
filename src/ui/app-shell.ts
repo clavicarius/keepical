@@ -8,12 +8,15 @@
 
 import type { CalendarModel, DateTimeValue, VEvent } from "../model/types.js";
 import { parseIcs } from "../parser/index.js";
+import { parseContentLine } from "../parser/contentline.js";
 import { encodeIcalText } from "../parser/text.js";
 import { serializeCalendar } from "../export/index.js";
+import { renderContentLine } from "../export/serialize.js";
 import { buildReport, validate } from "../validate/validator.js";
 import {
   addEvent,
   deleteEvent,
+  setEventProperties,
   removeEventProperty,
   setEventProperty,
   DEFAULT_UID_SUFFIX,
@@ -258,8 +261,15 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
 
       <details ${p.rrule.length ? "open" : ""}>
         <summary>Recurrence / exceptions</summary>
-        ${renderRRuleEditor(p.rrule[0] ?? "")}
-        <div class="field"><label>EXDATE (raw)</label><input id="e-exdate" value="${escapeHtml(p.exdate.join(",") )}" readonly /></div>
+  ${renderRRuleEditor(p.rrule[0] ?? "")}
+        <div class="field">
+          <label>EXDATE (eine Zeile pro Content-Line)</label>
+          <textarea id="e-exdate" rows="3">${escapeHtml(recurrenceLinesValue(ev, "EXDATE"))}</textarea>
+        </div>
+        <div class="field">
+          <label>RDATE (eine Zeile pro Content-Line)</label>
+          <textarea id="e-rdate" rows="3">${escapeHtml(recurrenceLinesValue(ev, "RDATE"))}</textarea>
+        </div>
       </details>
 
       <details>
@@ -291,6 +301,9 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
     on("#e-summary", "SUMMARY");
     on("#e-location", "LOCATION");
     on("#e-description", "DESCRIPTION");
+    on("#e-rrule", "RRULE");
+    this.bindRecurrenceListField(ev, "EXDATE");
+    this.bindRecurrenceListField(ev, "RDATE");
     this.bindRRuleFields(ev);
 
     this.bindDateTimeField(ev, "dtstart", "DTSTART");
@@ -323,6 +336,22 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
       const rawEl = this.querySelector(`#raw-${key}`);
       if (rawEl) rawEl.textContent = formatRawDateTime(dtv);
       this.renderList();
+    });
+  }
+
+  private bindRecurrenceListField(ev: VEvent, name: "EXDATE" | "RDATE"): void {
+    const input = this.querySelector<HTMLTextAreaElement>(`#e-${name.toLowerCase()}`);
+    if (!input) return;
+    input.addEventListener("change", () => {
+      const before = recurrenceLinesValue(ev, name);
+      const after = input.value.replace(/\r\n/g, "\n");
+      if (after === before) return;
+      const lines = parseRecurrenceLines(name, after);
+      setEventProperties(ev, name, lines);
+      if (name === "EXDATE") ev.parsed.exdate = lines.map((line) => line.value);
+      if (name === "RDATE") ev.parsed.rdate = lines.map((line) => line.value);
+      this.renderList();
+      this.renderEditor();
     });
   }
 
@@ -415,6 +444,30 @@ function renderDateTimeField(
       <input type="${picker.type}" id="e-${key}" value="${escapeHtml(picker.value)}" />
       <div class="raw-value" id="raw-${key}">${escapeHtml(formatRawDateTime(dtv))}</div>
     </div>`;
+}
+
+function recurrenceLinesValue(ev: VEvent, name: "EXDATE" | "RDATE"): string {
+  return ev.component.properties
+    .filter((p) => p.name === name)
+    .map((p) => renderContentLine(p))
+    .join("\n");
+}
+
+function parseRecurrenceLines(name: "EXDATE" | "RDATE", input: string) {
+  return input
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const fullLine =
+        line.startsWith(`${name};`) || line.startsWith(`${name}:`)
+          ? line
+          : `${name}${line.startsWith(";") || line.startsWith(":") ? "" : ":"}${line}`;
+      const parsed = parseContentLine(fullLine, []);
+      parsed.name = name;
+      parsed.rawLines = [];
+      return parsed;
+    });
 }
 
 function renderRRuleEditor(raw: string): string {

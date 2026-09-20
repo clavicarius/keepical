@@ -19,6 +19,9 @@ import {
   setEventProperties,
   removeEventProperty,
   setEventProperty,
+  getEventSeries,
+  isRecurrenceInstance,
+  resolveEventEditTarget,
   DEFAULT_UID_SUFFIX,
 } from "../model/calendar.js";
 import { icalToPickerValue, pickerToIcal } from "./datetime.js";
@@ -44,6 +47,7 @@ export class AppShell extends HTMLElement {
   private model: CalendarModel | null = null;
   private fileName = "kalender.ics";
   private selected: VEvent | null = null;
+  private editScope: "series" | "instance" = "instance";
   private uidSuffix = DEFAULT_UID_SUFFIX;
   private filter = { text: "", changedOnly: false, recurringOnly: false, alarmOnly: false };
 
@@ -233,6 +237,7 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
       row.addEventListener("click", () => {
         const idx = Number(row.dataset.idx);
         this.selected = this.model!.events[idx];
+        this.editScope = isRecurrenceInstance(this.selected) ? "instance" : "series";
         this.renderList();
         this.renderEditor();
         this.ensureSelectionVisible();
@@ -248,8 +253,24 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
       editor.innerHTML = `<div class="empty">Select an event to edit its details.</div>`;
       return;
     }
-    const p = ev.parsed;
+    const series = getEventSeries(this.model!, ev);
+    const target = resolveEventEditTarget(this.model!, ev, this.editScope);
+    const p = target.parsed;
     editor.innerHTML = `
+      ${
+        series.length > 1 || p.rrule.length > 0
+          ? `<div class="field"><label>Edit scope</label><select id="e-scope">
+              <option value="series" ${this.editScope === "series" ? "selected" : ""}>Whole series</option>
+              <option value="instance" ${this.editScope === "instance" ? "selected" : ""}>This occurrence</option>
+            </select><small class="muted">${
+              isRecurrenceInstance(ev) && this.editScope === "series"
+                ? "Editing the series master; this exception stays unchanged."
+                : isRecurrenceInstance(ev)
+                  ? "Editing only the RECURRENCE-ID exception."
+                  : "Editing the recurring series master."
+            }</small></div>`
+          : ""
+      }
       <div class="field"><label>UID (read-only)</label><div class="readonly uid-value">${escapeHtml(p.uid)}</div></div>
       <div class="field"><label>Title (SUMMARY)</label><input id="e-summary" value="${escapeHtml(p.summary ?? "")}" /></div>
       <div class="row2">
@@ -283,18 +304,24 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
       </div>
     `;
 
+    this.querySelector<HTMLSelectElement>("#e-scope")?.addEventListener("change", (e) => {
+      this.editScope = (e.target as HTMLSelectElement).value as "series" | "instance";
+      this.renderEditor();
+    });
+
     const on = (id: string, name: string) =>
       this.querySelector<HTMLInputElement>(id)?.addEventListener("change", (e) => {
+        const editTarget = resolveEventEditTarget(this.model!, ev, this.editScope);
         const value = (e.target as HTMLInputElement).value;
         const rawValue =
           name === "SUMMARY" || name === "LOCATION" || name === "DESCRIPTION"
             ? encodeIcalText(value)
             : value;
-        setEventProperty(ev, name, rawValue);
+        setEventProperty(editTarget, name, rawValue);
         // keep parsed view roughly in sync for the list rendering
-        if (name === "SUMMARY") ev.parsed.summary = value;
-        if (name === "LOCATION") ev.parsed.location = value;
-        if (name === "DESCRIPTION") ev.parsed.description = value;
+        if (name === "SUMMARY") editTarget.parsed.summary = value;
+        if (name === "LOCATION") editTarget.parsed.location = value;
+        if (name === "DESCRIPTION") editTarget.parsed.description = value;
         this.renderList();
         this.renderEditor();
       });
@@ -302,12 +329,12 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
     on("#e-location", "LOCATION");
     on("#e-description", "DESCRIPTION");
     on("#e-rrule", "RRULE");
-    this.bindRecurrenceListField(ev, "EXDATE");
-    this.bindRecurrenceListField(ev, "RDATE");
-    this.bindRRuleFields(ev);
+    this.bindRecurrenceListField(ev, "EXDATE", this.editScope);
+    this.bindRecurrenceListField(ev, "RDATE", this.editScope);
+    this.bindRRuleFields(ev, this.editScope);
 
-    this.bindDateTimeField(ev, "dtstart", "DTSTART");
-    this.bindDateTimeField(ev, "dtend", "DTEND");
+    this.bindDateTimeField(ev, "dtstart", "DTSTART", this.editScope);
+    this.bindDateTimeField(ev, "dtend", "DTEND", this.editScope);
 
     this.querySelector("#e-delete")?.addEventListener("click", () => {
       if (confirm("Delete this event? All other events will remain unchanged.")) {
@@ -323,50 +350,62 @@ ${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("
     });
   }
 
-  private bindDateTimeField(ev: VEvent, key: "dtstart" | "dtend", name: "DTSTART" | "DTEND"): void {
+  private bindDateTimeField(
+    ev: VEvent,
+    key: "dtstart" | "dtend",
+    name: "DTSTART" | "DTEND",
+    scope: "series" | "instance",
+  ): void {
     const input = this.querySelector<HTMLInputElement>(`#e-${key}`);
-    const dtv = ev.parsed[key];
+    const target = resolveEventEditTarget(this.model!, ev, scope);
+    const dtv = target.parsed[key];
     if (!input || !dtv) return;
     input.addEventListener("change", () => {
       const newRaw = pickerToIcal(input.value, dtv);
       if (newRaw === dtv.raw) return;
       dtv.raw = newRaw;
       dtv.isUtc = newRaw.endsWith("Z");
-      setEventProperty(ev, name, newRaw);
+      setEventProperty(target, name, newRaw);
       const rawEl = this.querySelector(`#raw-${key}`);
       if (rawEl) rawEl.textContent = formatRawDateTime(dtv);
       this.renderList();
     });
   }
 
-  private bindRecurrenceListField(ev: VEvent, name: "EXDATE" | "RDATE"): void {
+  private bindRecurrenceListField(
+    ev: VEvent,
+    name: "EXDATE" | "RDATE",
+    scope: "series" | "instance",
+  ): void {
     const input = this.querySelector<HTMLTextAreaElement>(`#e-${name.toLowerCase()}`);
     if (!input) return;
+    const target = resolveEventEditTarget(this.model!, ev, scope);
     input.addEventListener("change", () => {
-      const before = recurrenceLinesValue(ev, name);
+      const before = recurrenceLinesValue(target, name);
       const after = input.value.replace(/\r\n/g, "\n");
       if (after === before) return;
       const lines = parseRecurrenceLines(name, after);
-      setEventProperties(ev, name, lines);
-      if (name === "EXDATE") ev.parsed.exdate = lines.map((line) => line.value);
-      if (name === "RDATE") ev.parsed.rdate = lines.map((line) => line.value);
+      setEventProperties(target, name, lines);
+      if (name === "EXDATE") target.parsed.exdate = lines.map((line) => line.value);
+      if (name === "RDATE") target.parsed.rdate = lines.map((line) => line.value);
       this.renderList();
       this.renderEditor();
     });
   }
 
-  private bindRRuleFields(ev: VEvent): void {
+  private bindRRuleFields(ev: VEvent, scope: "series" | "instance"): void {
     const rawInput = this.querySelector<HTMLTextAreaElement>("#e-rrule");
     if (!rawInput) return;
+    const target = resolveEventEditTarget(this.model!, ev, scope);
 
     const applyRaw = (value: string): void => {
       const trimmed = value.trim();
       if (trimmed) {
-        setEventProperty(ev, "RRULE", trimmed);
-        ev.parsed.rrule = [trimmed];
+        setEventProperty(target, "RRULE", trimmed);
+        target.parsed.rrule = [trimmed];
       } else {
-        removeEventProperty(ev, "RRULE");
-        ev.parsed.rrule = [];
+        removeEventProperty(target, "RRULE");
+        target.parsed.rrule = [];
       }
       this.renderList();
       this.renderEditor();

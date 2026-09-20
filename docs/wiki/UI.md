@@ -25,11 +25,15 @@ Filters: search (title/location), changed only, recurring only, events with alar
 Standard fields: SUMMARY, DTSTART, DTEND, LOCATION, DESCRIPTION. Advanced sections
 (collapsible): a hybrid RRULE editor (`FREQ`, `INTERVAL`, `COUNT`, `UNTIL`,
 `BYDAY`, `BYMONTHDAY`, `BYSETPOS`) with always-visible raw fallback, EXDATE, plus
-a raw-data view of all properties. The UID is shown as **read-only**.
+a raw-data view of all properties. The UID is shown as **read-only**. For a
+recurring event, **Whole series** edits the master VEVENT, while **This
+occurrence** edits only the selected `RECURRENCE-ID` exception. The selected
+scope is explicit in the editor so existing exceptions are not overwritten by
+series changes.
 
-Changes go through `setEventProperty()` (`src/model/calendar.ts`), which marks the
-affected property in `changedProperties` and sets the component to `dirty` — the
-basis for selective patch export.
+Changes go through the scoped helpers in `src/model/calendar.ts`, which resolve
+the master or exception before calling `setEventProperty()` and mark the
+affected property in `changedProperties` — the basis for selective patch export.
 
 ## New / delete
 

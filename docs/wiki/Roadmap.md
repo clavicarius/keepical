@@ -9,8 +9,8 @@ even if the editor UI for them only arrives in phase 4.
 | 1 | Parser (unfold, contentline, tree, vevent) with rawLines preservation | done |
 | 2 | Read-only UI + lossless import/export roundtrip, tests | done |
 | 3 | Editing / new / delete with patch export | done (MVP) |
-| 4 | RRULE / RDATE / EXDATE / RECURRENCE-ID including raw-text fallback | open |
-| 5 | Validation + export report + before/after diff | partial (foundation exists) |
+| 4 | RRULE / RDATE / EXDATE / RECURRENCE-ID including raw-text fallback | done |
+| 5 | Validation + export report + before/after diff | done |
 | 6 | GitHub Pages + sample calendar + docs | done |
 
 ## Phase 1 — Parser
@@ -37,8 +37,9 @@ edit raw / abort. Distinguish single instance vs. series via RECURRENCE-ID.
 
 ## Phase 5 — Validation + report
 
-Structural checks, export report, and a diff per UID. Base implementation in
-`src/validate/validator.ts`. See [Export & Validation](Export-and-Validation.md).
+Structural and recurrence checks use stable error codes and separate errors from
+warnings. Export blocks errors, asks for confirmation on warnings, and reports
+before/after values per changed property and UID. See [Export & Validation](Export-and-Validation.md).
 
 ## Phase 6 — Deployment
 

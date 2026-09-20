@@ -27,6 +27,28 @@ describe("parseRRule", () => {
       unsupportedParts: ["BYHOUR=9", "WKST=MO"],
     });
   });
+
+  it("treats invalid supported values as unsupported instead of normalizing them", () => {
+    expect(
+      parseRRule("FREQ=WEEKLY;INTERVAL=0;COUNT=-1;UNTIL=2026;BYDAY=XX;BYMONTHDAY=foo;BYSETPOS=foo"),
+    ).toEqual({
+      freq: "WEEKLY",
+      interval: "",
+      count: "",
+      until: "",
+      byday: "",
+      bymonthday: "",
+      bysetpos: "",
+      unsupportedParts: [
+        "INTERVAL=0",
+        "COUNT=-1",
+        "UNTIL=2026",
+        "BYDAY=XX",
+        "BYMONTHDAY=foo",
+        "BYSETPOS=foo",
+      ],
+    });
+  });
 });
 
 describe("rruleModelToIcal", () => {
@@ -60,5 +82,12 @@ describe("rruleModelToIcal", () => {
         "FREQ=WEEKLY;BYDAY=MO",
       ),
     ).toBe("FREQ=WEEKLY;BYDAY=MO");
+  });
+
+  it("keeps an unsupported-only raw rule unchanged when structured fields are untouched", () => {
+    const raw = "FREQ=YEARLY;BYWEEKNO=1;WKST=MO";
+    const parsed = parseRRule(raw);
+
+    expect(rruleModelToIcal(parsed, raw)).toBe(raw);
   });
 });

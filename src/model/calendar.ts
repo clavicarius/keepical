@@ -64,6 +64,19 @@ export function setEventPropertyScoped(
   return target;
 }
 
+/** Apply a complete multi-line property edit to either a series or occurrence. */
+export function setEventPropertiesScoped(
+  model: CalendarModel,
+  event: VEvent,
+  name: string,
+  properties: ContentLine[],
+  scope: EventEditScope,
+): VEvent {
+  const target = resolveEventEditTarget(model, event, scope);
+  setEventProperties(target, name, properties);
+  return target;
+}
+
 /** Configurable suffix for generated UIDs (see project rules). */
 export const DEFAULT_UID_SUFFIX = "keepical.local";
 

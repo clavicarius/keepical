@@ -43,9 +43,14 @@ that block disappears.
 
 ## Export
 
-Before download, `validate()` runs and prompts on errors. Then
-`serializeCalendar()` creates the Blob download, followed by the report from
-`buildReport()`.
+Before download, `validate()` runs. Errors block the download and are shown with
+their codes and messages. Warnings require an explicit confirmation. After a
+successful export, `buildReport()` shows counts for unchanged, changed, new, and
+deleted events, preserved structures, and the actual before/after value for each
+changed property grouped by UID.
+
+`serializeCalendar()` remains the only export path, so validation and reporting
+never rewrite or normalize the calendar.
 
 ## Outlook
 

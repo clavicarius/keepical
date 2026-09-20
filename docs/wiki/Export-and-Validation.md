@@ -27,13 +27,24 @@ result. This is used only for **changed** properties.
 
 `validate()` checks conservatively without rewriting anything:
 
-- exactly one `VCALENDAR`
+- exactly one `VCALENDAR` (`VCALENDAR_MISSING`)
 - every `VEVENT` has `UID` and `DTSTART`
 - not both `DTEND` and `DURATION`
 - TZID consistency (no TZID together with UTC `Z`)
+- valid RRULE structure, required `FREQ`, positive integer parts, and duplicate
+  part detection, including `BYDAY`, `BYMONTHDAY`, and `BYSETPOS` lists
+- valid date/time values in `RDATE` and `EXDATE`
+- warnings for orphaned `RECURRENCE-ID` instances or exceptions carrying their
+  own `RRULE`
+- duplicate `RECURRENCE-ID` values within one UID series
+
+Validation is conservative: it reports issues but never rewrites the calendar.
+Errors block export until they are fixed. Warnings are shown with their stable
+code and require explicit confirmation before export continues.
 
 `buildReport()` returns the export report: counts of unchanged/changed/new/deleted,
 preserved UIDs, preserved `VTIMEZONE`/`VALARM`/unknown properties, plus a diff per
-UID (which property names changed).
+UID. Each changed property includes its rendered `before` and `after` value, so
+the report shows what actually changed instead of only listing property names.
 
 Continue to [UI](UI.md).

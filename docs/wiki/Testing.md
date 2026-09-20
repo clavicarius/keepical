@@ -25,6 +25,15 @@ overnight event.
 - `unfold`: continuation lines, LF-only.
 - `foldLine`: 75-octet limit with leading space.
 
+## Validation and report tests — `test/validator.test.ts`
+
+- Structural errors, recurrence warnings, and stable validation codes.
+- Conservative validation: invalid input is reported without mutation.
+- Actual before/after property values in the per-UID export diff.
+- `test/rrule.test.ts` covers supported, unsupported, and invalid RRULE parts.
+- `test/roundtrip.test.ts` covers EXDATE/RDATE and `RECURRENCE-ID` edits without
+  damaging untouched properties or existing exceptions.
+
 ## Core acceptance criterion
 
 If only the title changes, all other properties of that event and of all other

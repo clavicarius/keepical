@@ -12,7 +12,7 @@ import { parseContentLine } from "../parser/contentline.js";
 import { encodeIcalText } from "../parser/text.js";
 import { serializeCalendar } from "../export/index.js";
 import { renderContentLine } from "../export/serialize.js";
-import { buildReport, validate } from "../validate/validator.js";
+import { buildReport, validate, type ValidationIssue } from "../validate/validator.js";
 import {
   addEvent,
   deleteEvent,
@@ -65,14 +65,24 @@ export class AppShell extends HTMLElement {
 
   private export(): void {
     if (!this.model) return;
-    const issues = validate(this.model).filter((i) => i.severity === "error");
-    if (issues.length > 0) {
+    const issues = validate(this.model);
+    const errors = issues.filter((issue) => issue.severity === "error");
+    const warnings = issues.filter((issue) => issue.severity === "warning");
+    if (errors.length > 0) {
+      this.showReport(issues);
+      alert(`Export blockiert: ${errors.length} Validierungsfehler müssen zuerst behoben werden.`);
+      return;
+    }
+    if (warnings.length > 0) {
       const proceed = confirm(
-        `Es gibt ${issues.length} Validierungsfehler:\n` +
-          issues.map((i) => `- ${i.message}`).join("\n") +
+        `${warnings.length} Validierungswarnung(en):\n` +
+          warnings.map((issue) => `- ${issue.message}`).join("\n") +
           "\n\nTrotzdem exportieren?",
       );
-      if (!proceed) return;
+      if (!proceed) {
+        this.showReport(issues);
+        return;
+      }
     }
     const text = serializeCalendar(this.model, {
       eol: "\r\n",
@@ -85,15 +95,32 @@ export class AppShell extends HTMLElement {
     a.download = this.fileName;
     a.click();
     URL.revokeObjectURL(url);
-    this.showReport();
+    this.showReport(issues);
   }
 
-  private showReport(): void {
+  private showReport(issues: ValidationIssue[] = []): void {
     if (!this.model) return;
     const r = buildReport(this.model);
     const el = this.querySelector("#report");
     if (!el) return;
-    el.innerHTML = `<div class="report"><pre>Export created
+    const errors = issues.filter((issue) => issue.severity === "error");
+    const warnings = issues.filter((issue) => issue.severity === "warning");
+    const issueText = issues.length
+      ? `\nValidation: ${errors.length} error(s), ${warnings.length} warning(s)\n${issues
+          .map((issue) => `  [${issue.severity.toUpperCase()}] ${issue.code}: ${issue.message}`)
+          .join("\n")}`
+      : "\nValidation: no issues";
+    const diffText = r.perEvent
+      .flatMap((event) => [
+        `\n${event.uid}`,
+        ...event.details.flatMap((detail) => [
+          `  ${detail.name}:`,
+          `    before: ${detail.before || "<absent>"}`,
+          `    after:  ${detail.after || "<absent>"}`,
+        ]),
+      ])
+      .join("\n");
+    el.innerHTML = `<div class="report"><pre>Export summary
 
 VEVENT unchanged: ${r.unchanged}
 VEVENT changed:   ${r.changed}
@@ -103,7 +130,8 @@ UIDs preserved:   ${r.uidsPreserved}
 VTIMEZONE kept:   ${r.vtimezonePreserved ? "yes" : "—"}
 VALARM kept:      ${r.valarmsPreserved}
 Unknown properties kept: ${r.unknownPropertiesPreserved ? "yes" : "no"}
-${r.perEvent.map((d) => `\n${d.uid}\n  changed: ${d.changed.join(", ")}`).join("")}</pre></div>`;
+${issueText}
+Changed values:${diffText || " none"}</pre></div>`;
   }
 
   private visibleEvents(): VEvent[] {

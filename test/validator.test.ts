@@ -92,6 +92,22 @@ describe("validate", () => {
       ]),
     );
   });
+
+  it("warns when RRULE combines COUNT and UNTIL", () => {
+    const model = modelFromEvent(
+      [
+        "BEGIN:VEVENT",
+        "UID:count-until@example.org",
+        "DTSTART:20260106T180000Z",
+        "RRULE:FREQ=WEEKLY;COUNT=5;UNTIL=20260203T180000Z",
+        "END:VEVENT",
+      ].join("\r\n"),
+    );
+
+    expect(validate(model)).toContainEqual(
+      expect.objectContaining({ code: "RRULE_COUNT_UNTIL_CONFLICT", severity: "warning" }),
+    );
+  });
 });
 
 describe("buildReport", () => {

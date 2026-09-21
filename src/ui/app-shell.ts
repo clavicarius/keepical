@@ -6,13 +6,13 @@
  * virtual DOM. State lives in a single CalendarModel instance.
  */
 
-import type { CalendarModel, DateTimeValue, VEvent } from "../model/types.js";
+import type { CalendarModel, ContentLine, DateTimeValue, VEvent } from "../model/types.js";
 import { parseIcs } from "../parser/index.js";
 import { parseContentLine } from "../parser/contentline.js";
 import { encodeIcalText } from "../parser/text.js";
 import { serializeCalendar } from "../export/index.js";
 import { renderContentLine } from "../export/serialize.js";
-import { buildReport, validate, type ValidationIssue } from "../validate/validator.js";
+import { buildReport, validate, validateRRuleValue, type ValidationIssue } from "../validate/validator.js";
 import {
   addEvent,
   deleteEvent,
@@ -25,11 +25,26 @@ import {
   DEFAULT_UID_SUFFIX,
 } from "../model/calendar.js";
 import { icalToPickerValue, pickerToIcal } from "./datetime.js";
+import {
+  recurrenceContentLinesToEntries,
+  recurrenceEntriesToContentLines,
+  summarizeRecurrenceEntries,
+  validateRecurrenceEntries,
+  type RecurrenceEditorEntry,
+} from "./recurrence.js";
 import { parseRRule, rruleModelToIcal } from "./rrule.js";
 import logoUrl from "../assets/keepical-logo.png";
 
 const appVersion = __APP_VERSION__;
 const appCommitSha = __APP_COMMIT_SHA__;
+
+interface RecurrenceDialogState {
+  name: "EXDATE" | "RDATE";
+  scope: "series" | "instance";
+  entries: RecurrenceEditorEntry[];
+}
+
+type InlineIssue = Pick<ValidationIssue, "severity" | "code" | "message">;
 
 function fmtWhen(ev: VEvent): string {
   const dt = ev.parsed.dtstart;
@@ -48,6 +63,7 @@ export class AppShell extends HTMLElement {
   private fileName = "kalender.ics";
   private selected: VEvent | null = null;
   private editScope: "series" | "instance" = "instance";
+  private recurrenceDialog: RecurrenceDialogState | null = null;
   private uidSuffix = DEFAULT_UID_SUFFIX;
   private filter = { text: "", changedOnly: false, recurringOnly: false, alarmOnly: false };
 
@@ -60,6 +76,7 @@ export class AppShell extends HTMLElement {
     this.fileName = file.name;
     this.model = parseIcs(text);
     this.selected = null;
+    this.recurrenceDialog = null;
     this.render();
   }
 
@@ -271,6 +288,7 @@ Changed values:${diffText || " none"}</pre></div>`;
         const idx = Number(row.dataset.idx);
         this.selected = this.model!.events[idx];
         this.editScope = isRecurrenceInstance(this.selected) ? "instance" : "series";
+        this.recurrenceDialog = null;
         this.renderList();
         this.renderEditor();
         this.ensureSelectionVisible();
@@ -313,17 +331,11 @@ Changed values:${diffText || " none"}</pre></div>`;
       <div class="field"><label>Location (LOCATION)</label><input id="e-location" value="${escapeHtml(p.location ?? "")}" /></div>
       <div class="field"><label>Description (DESCRIPTION)</label><textarea id="e-description" class="description-input" rows="4">${escapeHtml(p.description ?? "")}</textarea></div>
 
-      <details ${p.rrule.length ? "open" : ""}>
+      <details ${p.rrule.length || target.parsed.exdate.length || target.parsed.rdate.length ? "open" : ""}>
         <summary>Recurrence / exceptions</summary>
   ${renderRRuleEditor(p.rrule[0] ?? "")}
-        <div class="field">
-          <label>EXDATE (eine Zeile pro Content-Line)</label>
-          <textarea id="e-exdate" rows="3">${escapeHtml(recurrenceLinesValue(target, "EXDATE"))}</textarea>
-        </div>
-        <div class="field">
-          <label>RDATE (eine Zeile pro Content-Line)</label>
-          <textarea id="e-rdate" rows="3">${escapeHtml(recurrenceLinesValue(target, "RDATE"))}</textarea>
-        </div>
+        ${renderRecurrenceFieldSummary(target, "EXDATE")}
+        ${renderRecurrenceFieldSummary(target, "RDATE")}
       </details>
 
       <details>
@@ -335,10 +347,12 @@ Changed values:${diffText || " none"}</pre></div>`;
         <button id="e-delete" style="color:var(--danger)">Delete</button>
         <span style="margin-left:auto; color:var(--muted)">${ev.changedProperties.size ? "changed: " + [...ev.changedProperties].join(", ") : "unchanged"}</span>
       </div>
+      ${this.recurrenceDialog ? renderRecurrenceDialog(this.recurrenceDialog) : ""}
     `;
 
     this.querySelector<HTMLSelectElement>("#e-scope")?.addEventListener("change", (e) => {
       this.editScope = (e.target as HTMLSelectElement).value as "series" | "instance";
+      this.recurrenceDialog = null;
       this.renderEditor();
     });
 
@@ -361,10 +375,11 @@ Changed values:${diffText || " none"}</pre></div>`;
     on("#e-summary", "SUMMARY");
     on("#e-location", "LOCATION");
     on("#e-description", "DESCRIPTION");
-    on("#e-rrule", "RRULE");
     this.bindRecurrenceListField(ev, "EXDATE", this.editScope);
     this.bindRecurrenceListField(ev, "RDATE", this.editScope);
     this.bindRRuleFields(ev, this.editScope);
+    this.bindRecurrenceSummaryButtons(ev);
+    this.bindRecurrenceDialog();
 
     this.bindDateTimeField(ev, "dtstart", "DTSTART", this.editScope);
     this.bindDateTimeField(ev, "dtend", "DTEND", this.editScope);
@@ -374,6 +389,7 @@ Changed values:${diffText || " none"}</pre></div>`;
         const visible = this.visibleEvents();
         const i = visible.indexOf(ev);
         deleteEvent(ev);
+        this.recurrenceDialog = null;
         const remaining = this.visibleEvents();
         this.selected = remaining[i] ?? remaining[i - 1] ?? null;
         this.renderList();
@@ -421,9 +437,115 @@ Changed values:${diffText || " none"}</pre></div>`;
       setEventPropertiesScoped(this.model!, ev, name, lines, scope);
       if (name === "EXDATE") target.parsed.exdate = lines.map((line) => line.value);
       if (name === "RDATE") target.parsed.rdate = lines.map((line) => line.value);
+      this.recurrenceDialog = null;
       this.renderList();
       this.renderEditor();
     });
+  }
+
+  private bindRecurrenceSummaryButtons(ev: VEvent): void {
+    for (const name of ["EXDATE", "RDATE"] as const) {
+      this.querySelector(`#open-${name.toLowerCase()}-dialog`)?.addEventListener("click", () => {
+        this.openRecurrenceDialog(ev, name, this.editScope, false);
+      });
+      this.querySelector(`#add-${name.toLowerCase()}-entry`)?.addEventListener("click", () => {
+        this.openRecurrenceDialog(ev, name, this.editScope, true);
+      });
+      this.querySelector(`#clear-${name.toLowerCase()}-entries`)?.addEventListener("click", () => {
+        const target = resolveEventEditTarget(this.model!, ev, this.editScope);
+        if (!target.component.properties.some((property) => property.name === name)) return;
+        setEventPropertiesScoped(this.model!, ev, name, [], this.editScope);
+        if (name === "EXDATE") target.parsed.exdate = [];
+        if (name === "RDATE") target.parsed.rdate = [];
+        if (this.recurrenceDialog?.name === name) this.recurrenceDialog = null;
+        this.renderList();
+        this.renderEditor();
+      });
+    }
+  }
+
+  private bindRecurrenceDialog(): void {
+    const dialog = this.recurrenceDialog;
+    if (!dialog) return;
+    this.querySelector("#recurrence-dialog-close")?.addEventListener("click", () => {
+      this.recurrenceDialog = null;
+      this.renderEditor();
+    });
+    this.querySelector("#recurrence-dialog-cancel")?.addEventListener("click", () => {
+      this.recurrenceDialog = null;
+      this.renderEditor();
+    });
+    this.querySelector("#recurrence-dialog-apply")?.addEventListener("click", () => this.applyRecurrenceDialog());
+    this.querySelector("#recurrence-dialog-add")?.addEventListener("click", () => {
+      dialog.entries.push(defaultRecurrenceEntry(this.currentRecurrenceTarget()));
+      this.renderEditor();
+    });
+
+    dialog.entries.forEach((entry, index) => {
+      this.querySelector<HTMLSelectElement>(`#recurrence-type-${index}`)?.addEventListener("change", (e) => {
+        entry.valueType = (e.target as HTMLSelectElement).value as "DATE" | "DATE-TIME";
+        entry.value = coerceRecurrenceEntryValue(entry.value, entry.valueType);
+        if (entry.valueType === "DATE") entry.tzid = "";
+        this.renderEditor();
+      });
+      this.querySelector<HTMLInputElement>(`#recurrence-value-${index}`)?.addEventListener("change", (e) => {
+        entry.value = recurrenceInputToRaw(
+          entry,
+          (e.target as HTMLInputElement).value,
+        );
+        this.renderEditor();
+      });
+      this.querySelector<HTMLInputElement>(`#recurrence-tzid-${index}`)?.addEventListener("change", (e) => {
+        entry.tzid = (e.target as HTMLInputElement).value.trim();
+        this.renderEditor();
+      });
+      this.querySelector(`#recurrence-remove-${index}`)?.addEventListener("click", () => {
+        dialog.entries.splice(index, 1);
+        this.renderEditor();
+      });
+    });
+  }
+
+  private openRecurrenceDialog(
+    ev: VEvent,
+    name: "EXDATE" | "RDATE",
+    scope: "series" | "instance",
+    addBlank: boolean,
+  ): void {
+    const target = resolveEventEditTarget(this.model!, ev, scope);
+    const entries = recurrenceContentLinesToEntries(recurrenceLines(target, name));
+    if (addBlank || entries.length === 0) {
+      entries.push(defaultRecurrenceEntry(target));
+    }
+    this.recurrenceDialog = { name, scope, entries };
+    this.renderEditor();
+  }
+
+  private applyRecurrenceDialog(): void {
+    if (!this.model || !this.selected || !this.recurrenceDialog) return;
+    const dialog = this.recurrenceDialog;
+    const issues = validateRecurrenceEntries(dialog.name, dialog.entries);
+    if (issues.some((issue) => issue.severity === "error")) return;
+
+    const nextLines = recurrenceEntriesToContentLines(dialog.name, dialog.entries);
+    const target = this.currentRecurrenceTarget();
+    const before = recurrenceLinesValue(target, dialog.name);
+    const after = recurrenceLinesValueFromLines(nextLines);
+    if (before !== after) {
+      setEventPropertiesScoped(this.model, this.selected, dialog.name, nextLines, dialog.scope);
+      const editTarget = resolveEventEditTarget(this.model, this.selected, dialog.scope);
+      if (dialog.name === "EXDATE") editTarget.parsed.exdate = nextLines.map((line) => line.value);
+      if (dialog.name === "RDATE") editTarget.parsed.rdate = nextLines.map((line) => line.value);
+      this.renderList();
+    }
+    this.recurrenceDialog = null;
+    this.renderEditor();
+  }
+
+  private currentRecurrenceTarget(): VEvent {
+    if (!this.model || !this.selected) throw new Error("No selected event.");
+    const scope = this.recurrenceDialog?.scope ?? this.editScope;
+    return resolveEventEditTarget(this.model, this.selected, scope);
   }
 
   private bindRRuleFields(ev: VEvent, scope: "series" | "instance"): void {
@@ -489,6 +611,7 @@ Changed values:${diffText || " none"}</pre></div>`;
     const allDay = /^\d{8}$/.test(dtstart);
     const ev = addEvent(this.model, { summary, dtstart, allDay }, this.uidSuffix);
     this.selected = ev;
+    this.recurrenceDialog = null;
     this.render();
     this.ensureSelectionVisible();
   }
@@ -518,11 +641,16 @@ function renderDateTimeField(
     </div>`;
 }
 
+function recurrenceLines(ev: VEvent, name: "EXDATE" | "RDATE"): ContentLine[] {
+  return ev.component.properties.filter((p) => p.name === name);
+}
+
 function recurrenceLinesValue(ev: VEvent, name: "EXDATE" | "RDATE"): string {
-  return ev.component.properties
-    .filter((p) => p.name === name)
-    .map((p) => renderContentLine(p))
-    .join("\n");
+  return recurrenceLinesValueFromLines(recurrenceLines(ev, name));
+}
+
+function recurrenceLinesValueFromLines(lines: ContentLine[]): string {
+  return lines.map((line) => renderContentLine(line)).join("\n");
 }
 
 function parseRecurrenceLines(name: "EXDATE" | "RDATE", input: string) {
@@ -544,6 +672,7 @@ function parseRecurrenceLines(name: "EXDATE" | "RDATE", input: string) {
 
 function renderRRuleEditor(raw: string): string {
   const model = parseRRule(raw);
+  const issues = raw.trim() ? validateRRuleValue(raw.trim()) : [];
   return `
     <div class="row2">
       <div class="field">
@@ -594,14 +723,159 @@ function renderRRuleEditor(raw: string): string {
         : ""
     }
     <div class="field">
+      <div class="raw-value">Tip: use either COUNT or UNTIL, not both. Unsupported RRULE parts remain in raw form.</div>
+    </div>
+    ${renderValidationList(issues)}
+    <div class="field">
       <label>RRULE (raw)</label>
       <textarea id="e-rrule" rows="3">${escapeHtml(raw)}</textarea>
     </div>
   `;
 }
 
+function renderRecurrenceFieldSummary(ev: VEvent, name: "EXDATE" | "RDATE"): string {
+  const entries = recurrenceContentLinesToEntries(recurrenceLines(ev, name));
+  return `<div class="field recurrence-summary">
+      <label>${escapeHtml(name)}</label>
+      <div class="recurrence-summary-card">
+        <div>
+          <div class="recurrence-summary-text">${escapeHtml(summarizeRecurrenceEntries(entries))}</div>
+          <div class="raw-value">Komfortmodus für einzelne Einträge, Rohtext darunter für Power-User.</div>
+        </div>
+        <div class="recurrence-summary-actions">
+          <button type="button" id="add-${name.toLowerCase()}-entry">+ Hinzufügen…</button>
+          <button type="button" id="open-${name.toLowerCase()}-dialog">Bearbeiten…</button>
+          <button type="button" id="clear-${name.toLowerCase()}-entries" ${entries.length ? "" : "disabled"}>Leeren</button>
+        </div>
+      </div>
+      <details>
+        <summary>Rohtext</summary>
+        <textarea id="e-${name.toLowerCase()}" rows="3">${escapeHtml(recurrenceLinesValue(ev, name))}</textarea>
+        <div class="raw-value">Eine Content-Line pro Zeile; mehrere Werte pro Zeile bleiben unterstützt.</div>
+      </details>
+    </div>`;
+}
+
+function renderRecurrenceDialog(dialog: RecurrenceDialogState): string {
+  const issues = validateRecurrenceEntries(dialog.name, dialog.entries);
+  return `<div class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>${escapeHtml(dialog.name)} bearbeiten</h2>
+          <button type="button" id="recurrence-dialog-close" aria-label="Dialog schließen">✕</button>
+        </div>
+        <div class="raw-value">Scope: ${escapeHtml(dialog.scope === "series" ? "ganze Serie" : "dieses Vorkommen")}</div>
+        ${renderValidationList(issues)}
+        <div class="recurrence-entry-list">
+          ${
+            dialog.entries.length
+              ? dialog.entries
+                  .map(
+                    (entry, index) => `<div class="recurrence-entry-row">
+                <div class="row2">
+                  <div class="field">
+                    <label>Typ</label>
+                    <select id="recurrence-type-${index}">
+                      <option value="DATE" ${entry.valueType === "DATE" ? "selected" : ""}>Datum</option>
+                      <option value="DATE-TIME" ${entry.valueType === "DATE-TIME" ? "selected" : ""}>Datum/Zeit</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Wert</label>
+                    <input id="recurrence-value-${index}" type="${entry.valueType === "DATE" ? "date" : "datetime-local"}" value="${escapeHtml(recurrenceRawToInput(entry))}" />
+                  </div>
+                </div>
+                ${
+                  entry.valueType === "DATE-TIME"
+                    ? `<div class="field"><label>TZID (optional)</label><input id="recurrence-tzid-${index}" value="${escapeHtml(entry.tzid)}" placeholder="Europe/Berlin" /></div>`
+                    : ""
+                }
+                <div class="recurrence-entry-actions">
+                  <button type="button" id="recurrence-remove-${index}">Eintrag entfernen</button>
+                </div>
+              </div>`,
+                  )
+                  .join("")
+              : `<div class="empty">Noch keine Einträge.</div>`
+          }
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="recurrence-dialog-add">+ Eintrag</button>
+          <span class="modal-spacer"></span>
+          <button type="button" id="recurrence-dialog-cancel">Abbrechen</button>
+          <button type="button" id="recurrence-dialog-apply" class="primary" ${issues.some((issue) => issue.severity === "error") ? "disabled" : ""}>Übernehmen</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderValidationList(issues: InlineIssue[]): string {
+  if (issues.length === 0) return "";
+  return `<div class="validation-list">
+      ${issues
+        .map(
+          (issue) =>
+            `<div class="validation-item ${issue.severity}">[${escapeHtml(issue.code)}] ${escapeHtml(issue.message)}</div>`,
+        )
+        .join("")}
+    </div>`;
+}
+
 function renderRRuleFreqOption(value: string, selected: string, label: string = value): string {
   return `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`;
+}
+
+function recurrenceRawToInput(entry: RecurrenceEditorEntry): string {
+  if (!entry.value) return "";
+  return icalToPickerValue({
+    raw: entry.value,
+    isDate: entry.valueType === "DATE",
+    isUtc: /Z$/.test(entry.value),
+    tzid: entry.tzid || undefined,
+  }).value;
+}
+
+function recurrenceInputToRaw(entry: RecurrenceEditorEntry, value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (entry.valueType === "DATE") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    return match ? `${match[1]}${match[2]}${match[3]}` : entry.value;
+  }
+  const prev: DateTimeValue = {
+    raw: coerceRecurrenceEntryValue(entry.value, "DATE-TIME") || "19700101T000000",
+    isDate: false,
+    isUtc: /Z$/.test(entry.value),
+    tzid: entry.tzid || undefined,
+  };
+  return pickerToIcal(trimmed, prev);
+}
+
+function coerceRecurrenceEntryValue(value: string, nextType: "DATE" | "DATE-TIME"): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const dateMatch = /^(\d{8})$/.exec(trimmed);
+  const datetimeMatch = /^(\d{8})T(\d{6})(Z)?$/.exec(trimmed);
+  if (nextType === "DATE") {
+    if (dateMatch) return dateMatch[1];
+    if (datetimeMatch) return datetimeMatch[1];
+    return trimmed;
+  }
+  if (datetimeMatch) return trimmed;
+  if (dateMatch) return `${dateMatch[1]}T000000`;
+  return trimmed;
+}
+
+function defaultRecurrenceEntry(ev: VEvent): RecurrenceEditorEntry {
+  const dt = ev.parsed.dtstart;
+  const valueType = dt?.isDate ? "DATE" : "DATE-TIME";
+  return {
+    value: dt?.raw ?? "",
+    valueType,
+    tzid: valueType === "DATE-TIME" ? dt?.tzid ?? "" : "",
+    parameters: valueType === "DATE" ? { VALUE: ["DATE"] } : dt?.tzid ? { TZID: [dt.tzid] } : {},
+    parameterOrder: valueType === "DATE" ? ["VALUE"] : dt?.tzid ? ["TZID"] : [],
+  };
 }
 
 function escapeHtml(s: string): string {

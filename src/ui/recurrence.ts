@@ -21,9 +21,10 @@ const DATE_TIME_VALUE_RE = /^\d{8}T\d{6}Z?$/;
 export function recurrenceContentLinesToEntries(lines: ContentLine[]): RecurrenceEditorEntry[] {
   return lines.flatMap((line) => {
     const values = line.value.split(",").map((value) => value.trim());
-    const valueType = line.parameters.VALUE?.[0] === "DATE" ? "DATE" : "DATE-TIME";
+    const valueType: RecurrenceEditorEntry["valueType"] =
+      line.parameters.VALUE?.[0] === "DATE" ? "DATE" : "DATE-TIME";
     const tzid = line.parameters.TZID?.[0] ?? "";
-    const base = {
+    const base: Omit<RecurrenceEditorEntry, "value"> = {
       valueType,
       tzid,
       parameters: cloneParameters(line.parameters),
@@ -54,7 +55,7 @@ export function summarizeRecurrenceEntries(entries: RecurrenceEditorEntry[]): st
   if (entries.length === 0) return "Keine Einträge";
   const preview = entries.slice(0, 2).map(formatRecurrenceEntry);
   const more = entries.length > 2 ? ` +${entries.length - 2} weitere` : "";
-  return `${entries.length} Eintrag${entries.length === 1 ? "" : "e"}: ${preview.join(" • ")}${more}`;
+  return `${entries.length} ${entries.length === 1 ? "Eintrag" : "Einträge"}: ${preview.join(" • ")}${more}`;
 }
 
 export function validateRecurrenceEntries(

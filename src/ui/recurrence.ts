@@ -21,8 +21,12 @@ const DATE_TIME_VALUE_RE = /^\d{8}T\d{6}Z?$/;
 export function recurrenceContentLinesToEntries(lines: ContentLine[]): RecurrenceEditorEntry[] {
   return lines.flatMap((line) => {
     const values = line.value.split(",").map((value) => value.trim());
+    const valueTypeParameter = line.parameters.VALUE?.[0]?.toUpperCase();
     const valueType: RecurrenceEditorEntry["valueType"] =
-      line.parameters.VALUE?.[0] === "DATE" ? "DATE" : "DATE-TIME";
+      valueTypeParameter === "DATE" ||
+      (valueTypeParameter === undefined && /^\d{8}$/.test(line.value.trim()))
+        ? "DATE"
+        : "DATE-TIME";
     const tzid = line.parameters.TZID?.[0] ?? "";
     const base: Omit<RecurrenceEditorEntry, "value"> = {
       valueType,

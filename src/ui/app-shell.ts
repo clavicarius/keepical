@@ -514,8 +514,8 @@ Changed values:${diffText || " none"}</pre></div>`;
   ): void {
     const target = resolveEventEditTarget(this.model!, ev, scope);
     const entries = recurrenceContentLinesToEntries(recurrenceLines(target, name));
-    if (addBlank || entries.length === 0) {
-      entries.push(defaultRecurrenceEntry(target));
+    if (addBlank) {
+      entries.push({ ...defaultRecurrenceEntry(target), value: "" });
     }
     this.recurrenceDialog = { name, scope, entries };
     this.renderEditor();

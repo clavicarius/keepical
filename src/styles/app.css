@@ -217,12 +217,15 @@ input, select, textarea {
 .validation-item + .validation-item { margin-top: 0.35rem; }
 
 .modal-backdrop {
-  position: sticky;
+  position: fixed;
   inset: 0;
+  z-index: 20;
   display: grid;
   place-items: center;
-  margin-top: 1rem;
-  padding: 1rem 0 0;
+  margin-top: 0;
+  padding: 1rem;
+  overflow-y: auto;
+  background: rgb(0 0 0 / 35%);
 }
 
 .modal-card {

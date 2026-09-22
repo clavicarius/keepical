@@ -8,6 +8,7 @@
   --accent: #2563eb;
   --changed: #b45309;
   --danger: #dc2626;
+  --warning: #b45309;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
@@ -21,6 +22,7 @@
     --accent: #5b9dff;
     --changed: #f59e0b;
     --danger: #f87171;
+    --warning: #f59e0b;
   }
 }
 
@@ -170,6 +172,96 @@ input, select, textarea {
   font-variant-numeric: tabular-nums;
 }
 
+.recurrence-summary-card,
+.recurrence-entry-row,
+.validation-list,
+.modal-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.recurrence-summary-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem;
+}
+
+.recurrence-summary-text {
+  font-weight: 600;
+}
+
+.recurrence-summary-actions,
+.recurrence-entry-actions,
+.modal-actions,
+.modal-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.recurrence-summary-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.validation-list {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.75rem;
+}
+
+.validation-item.error { color: var(--danger); }
+.validation-item.warning { color: var(--warning); }
+.validation-item + .validation-item { margin-top: 0.35rem; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  margin-top: 0;
+  padding: 1rem;
+  overflow-y: auto;
+  background: rgb(0 0 0 / 35%);
+}
+
+.modal-card {
+  width: min(100%, 42rem);
+  padding: 1rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+}
+
+.modal-header {
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.modal-header h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.recurrence-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recurrence-entry-row {
+  padding: 0.75rem;
+}
+
+.modal-actions {
+  margin-top: 1rem;
+}
+
+.modal-spacer {
+  flex: 1;
+}
+
 #e-rrule {
   min-height: 5.5rem;
   resize: vertical;
@@ -236,6 +328,13 @@ summary { cursor: pointer; font-weight: 600; }
 
   .description-input {
     min-height: 8rem;
+  }
+
+   .recurrence-summary-card,
+   .modal-actions,
+   .modal-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   /* Mobile: fixed 1-line row height + single-line ellipsis */

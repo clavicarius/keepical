@@ -66,7 +66,7 @@ function issue(
   return { severity, code, message, uid };
 }
 
-function validateRule(raw: string, uid: string | undefined): ValidationIssue[] {
+export function validateRRuleValue(raw: string, uid?: string): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const parts = raw.split(";").map((part) => part.trim()).filter(Boolean);
   const names = new Set<string>();
@@ -102,6 +102,9 @@ function validateRule(raw: string, uid: string | undefined): ValidationIssue[] {
     }
   }
 
+  if (names.has("COUNT") && names.has("UNTIL")) {
+    issues.push(issue("warning", "RRULE_COUNT_UNTIL_CONFLICT", "RRULE should not combine COUNT and UNTIL in the same rule.", uid));
+  }
   if (!hasFreq) issues.push(issue("error", "RRULE_MISSING_FREQ", "RRULE must contain FREQ.", uid));
   return issues;
 }
@@ -154,7 +157,7 @@ export function validate(model: CalendarModel): ValidationIssue[] {
     }
 
     for (const property of ev.component.properties) {
-      if (property.name === "RRULE") issues.push(...validateRule(property.value, uid));
+      if (property.name === "RRULE") issues.push(...validateRRuleValue(property.value, uid));
       if (property.name === "RDATE" || property.name === "EXDATE") {
         issues.push(...validateDateList(property.name, property.value, uid));
       }

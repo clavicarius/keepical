@@ -1,0 +1,27 @@
+name: ❓ Frage
+description: Allgemeine Frage zum Projekt
+title: "[Question]: "
+labels: ["question"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Hinweis:** Für allgemeine Fragen empfehlen wir [GitHub Discussions](./discussions).
+        Issues sind primär für Bugs und Feature Requests gedacht.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Deine Frage
+      placeholder: Was möchtest du wissen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Kontext
+      description: Was hast du bereits versucht? Welche Version nutzt du?
+    validations:
+      required: false

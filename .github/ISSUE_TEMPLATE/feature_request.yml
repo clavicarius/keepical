@@ -1,0 +1,56 @@
+name: ✨ Feature Request
+description: Neue Funktion oder Verbesserung vorschlagen
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Beschreibe dein Feature so konkret wie möglich. Je mehr Kontext, desto besser können wir es bewerten.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Motivation
+      description: Welches Problem soll gelöst werden? Warum ist das wichtig?
+      placeholder: "Als Nutzer möchte ich ..., damit ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Vorgeschlagene Lösung
+      description: Wie stellst du dir die Umsetzung vor?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen
+      description: Hast du andere Lösungsansätze in Betracht gezogen?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priorität (aus Nutzersicht)
+      options:
+        - Must-have
+        - Nice-to-have
+        - Idee für die Zukunft
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checkliste
+      options:
+        - label: Ich habe nach ähnlichen Feature-Requests gesucht
+          required: true
+        - label: Dieses Feature passt zum Scope des Projekts
+          required: false

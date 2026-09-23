@@ -1,0 +1,97 @@
+name: 🐛 Bug Report
+description: Etwas funktioniert nicht wie erwartet
+title: "[Bug]: "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für deinen Bug Report! Bitte prüfe vorher, ob das Problem [bereits gemeldet wurde](./issues?q=is%3Aissue+label%3Abug).
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung
+      description: Was ist passiert? Was hast du erwartet?
+      placeholder: Kurze, klare Beschreibung des Problems
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zur Reproduktion
+      description: Wie kann man den Bug nachstellen?
+      placeholder: |
+        1. Gehe zu '...'
+        2. Klicke auf '...'
+        3. Siehe Fehler
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartetes Verhalten
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Tatsächliches Verhalten
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Schweregrad
+      options:
+        - Kritisch (System down / Datenverlust)
+        - Hoch (Hauptfunktion betroffen)
+        - Mittel (Workaround vorhanden)
+        - Niedrig (kosmetisch / Randfall)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Welche Version ist betroffen?
+      placeholder: "z.B. v1.2.3"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Umgebung
+      description: OS, Browser, Runtime, etc.
+      placeholder: |
+        - OS: Windows 11 / macOS 14 / Ubuntu 22.04
+        - Browser: Chrome 120
+        - Node.js: 20.x
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: Relevante Fehlermeldungen oder Screenshots
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checkliste
+      options:
+        - label: Ich habe nach bestehenden Issues gesucht
+          required: true
+        - label: Ich habe die neueste Version getestet
+          required: true

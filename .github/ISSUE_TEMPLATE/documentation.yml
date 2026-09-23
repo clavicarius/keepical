@@ -1,0 +1,44 @@
+name: 📖 Dokumentation
+description: Fehler, Lücken oder Verbesserungen in der Doku melden
+title: "[Docs]: "
+labels: ["documentation", "triage"]
+assignees: []
+body:
+  - type: textarea
+    id: location
+    attributes:
+      label: Betroffene Stelle
+      description: URL, Dateipfad oder Abschnitt
+      placeholder: "z.B. README.md, Abschnitt 'Installation', Zeile 42"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Art des Problems
+      options:
+        - Tippfehler / Grammatik
+        - Veraltete Information
+        - Fehlende Erklärung
+        - Falsches Beispiel
+        - Fehlende Übersetzung
+        - Anderes
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung
+      description: Was ist falsch oder fehlt?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Vorschlag zur Verbesserung
+      description: Wie sollte es lauten?
+    validations:
+      required: false

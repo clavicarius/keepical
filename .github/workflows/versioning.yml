@@ -25,7 +25,7 @@ jobs:
       github.actor != 'github-actions[bot]')
     runs-on: ubuntu-latest
     outputs:
-      next-tag: ${{ steps.version.outputs.next-tag }}
+      next-tag: ${{ steps.version.outputs.next_tag }}
       published: ${{ steps.publish.outputs.published || 'false' }}
     steps:
       - name: Checkout
@@ -35,14 +35,30 @@ jobs:
 
       - name: Compute version
         id: version
-        uses: ./.github/actions/compute-version
+        uses: clavicarius/ci-platform/actions/release-semver-versioning@v1
+
+      - name: Resolve version metadata
+        id: tag-state
+        env:
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+        run: |
+          latest_tag="$(git ls-remote --tags --refs origin 'refs/tags/v*.*.*' | awk '{sub("refs/tags/", "", $2); print $2}' | sort -V | tail -n1)"
+          if git ls-remote --exit-code --tags --refs origin "refs/tags/$NEXT_TAG" >/dev/null 2>&1; then
+            tag_exists=true
+          else
+            tag_exists=false
+          fi
+          {
+            echo "latest-tag=$latest_tag"
+            echo "tag-exists=$tag_exists"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Report dry run
         if: github.event_name == 'pull_request'
         env:
-          LATEST_TAG: ${{ steps.version.outputs.latest-tag }}
-          NEXT_TAG: ${{ steps.version.outputs.next-tag }}
-          TAG_EXISTS: ${{ steps.version.outputs.tag-exists }}
+          LATEST_TAG: ${{ steps.tag-state.outputs.latest-tag }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
+          TAG_EXISTS: ${{ steps.tag-state.outputs.tag-exists }}
         run: |
           echo "Latest semantic tag: ${LATEST_TAG:-none}"
           echo "Next version tag: $NEXT_TAG"
@@ -53,9 +69,9 @@ jobs:
         if: >-
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' &&
-          steps.version.outputs.tag-exists != 'true'
+          steps.tag-state.outputs.tag-exists != 'true'
         env:
-          NEXT_TAG: ${{ steps.version.outputs.next-tag }}
+          NEXT_TAG: ${{ steps.version.outputs.next_tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -67,8 +83,8 @@ jobs:
         if: >-
           github.event_name == 'push' &&
           github.ref == 'refs/heads/main' &&
-          steps.version.outputs.tag-exists == 'true'
-        run: echo "Version tag ${{ steps.version.outputs.next-tag }} already exists."
+          steps.tag-state.outputs.tag-exists == 'true'
+        run: echo "Version tag ${{ steps.version.outputs.next_tag }} already exists."
 
   deploy-pages:
     name: Deploy GitHub Pages

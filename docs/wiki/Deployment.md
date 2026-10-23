@@ -44,8 +44,20 @@ Pages job concurrency stays on the deploy job itself (`group: pages`); a top-lev
 `concurrency: pages` is intentionally **not** set (deadlock with the deploy job; see
 PR #10).
 
+### PR build check
+
+[`pr-build.yml`](../.github/workflows/pr-build.yml) ("PR Build", job `build`) runs
+`npm ci`, `npm test` and `npm run build` on every pull request targeting `main`.
+It does not deploy anything. To make it mandatory, add **`PR Build / build`** as a
+required status check in the branch protection rule or ruleset for `main`
+(Settings -> Branches). That setting cannot be changed from a workflow file.
+
+Workflow runs triggered by Copilot first need approval ("Approve and run
+workflows") before the check starts.
+
 Current workflow definitions:
 
+- [`.github/workflows/pr-build.yml`](../.github/workflows/pr-build.yml)
 - [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
 - [`.github/workflows/versioning.yml`](../.github/workflows/versioning.yml)
 

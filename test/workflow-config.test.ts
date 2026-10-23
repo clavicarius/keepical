@@ -43,4 +43,27 @@ describe("workflow configuration", () => {
     expect(wikiWorkflow).toMatch(/concurrency:\r?\n\s*group: wiki-sync/);
     expect(wikiWorkflow).toMatch(/permissions:\r?\n\s*contents: write/);
   });
+
+  it("label management syncs labels from the repository CSV", () => {
+    const labelsWorkflow = readFileSync(
+      new URL("../.github/workflows/maintenance-label-management.yml", import.meta.url),
+      "utf8",
+    );
+    const labelsCsv = readFileSync(
+      new URL("../.github/gh-labels.csv", import.meta.url),
+      "utf8",
+    );
+
+    expect(labelsWorkflow).toContain("workflow_dispatch:");
+    expect(labelsWorkflow).toContain("'.github/gh-labels.csv'");
+    expect(labelsWorkflow).toContain(
+      "uses: clavicarius/ci-platform/actions/maintenance-label-management@v1",
+    );
+    expect(labelsWorkflow).toContain("issues: write");
+    expect(labelsWorkflow).toContain("csv-file: .github/gh-labels.csv");
+    expect(labelsWorkflow).toContain("github-token: ${{ github.token }}");
+    expect(labelsCsv.split(/\r?\n/)).toHaveLength(15);
+    expect(labelsCsv).toContain("category;name;color;description");
+    expect(labelsCsv).toContain('Priority;priority: high;D73A4A;"🔴 High priority – should be addressed soon."');
+  });
 });

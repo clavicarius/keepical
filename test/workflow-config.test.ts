@@ -43,4 +43,37 @@ describe("workflow configuration", () => {
     expect(wikiWorkflow).toMatch(/concurrency:\r?\n\s*group: wiki-sync/);
     expect(wikiWorkflow).toMatch(/permissions:\r?\n\s*contents: write/);
   });
+
+  it("label management syncs labels from the repository CSV", () => {
+    const labelsWorkflow = readFileSync(
+      new URL("../.github/workflows/maintenance-label-management.yml", import.meta.url),
+      "utf8",
+    );
+    const labelsCsv = readFileSync(
+      new URL("../.github/gh-labels.csv", import.meta.url),
+      "utf8",
+    );
+
+    expect(labelsWorkflow).toContain("workflow_dispatch:");
+    expect(labelsWorkflow).toContain("'.github/gh-labels.csv'");
+    expect(labelsWorkflow).toContain(
+      "uses: clavicarius/ci-platform/actions/maintenance-label-management@v1",
+    );
+    expect(labelsWorkflow).toContain("issues: write");
+    expect(labelsWorkflow).toContain("csv-file: .github/gh-labels.csv");
+    expect(labelsWorkflow).toContain("github-token: ${{ github.token }}");
+    expect(labelsCsv.trimEnd().split(/\r?\n/)).toHaveLength(16);
+    expect(labelsCsv).toContain("category;name;color;description");
+    expect(labelsCsv).toContain('Priority;priority: high;D73A4A;"🔴 High priority – should be addressed soon."');
+  });
+
+  it("PR build workflow targets main and documentation duty is documented", () => {
+    const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+    const prBuild = read("../.github/workflows/pr-build.yml");
+    expect(prBuild).toContain("pull_request:");
+    expect(prBuild).toContain("npm run build");
+    expect(read("../docs/wiki/Deployment.md")).toContain("PR Build / build");
+    expect(read("../CONTRIBUTING.md")).toContain("Documentation is mandatory");
+    expect(read("../.github/pull_request_template.md")).toContain("Documentation updated");
+  });
 });

@@ -1,0 +1,30 @@
+name: Maintenance Label Management
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/gh-labels.csv'
+      - '.github/workflows/maintenance-label-management.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  manage-labels:
+    name: Create or update repository labels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Manage labels
+        if: hashFiles('.github/gh-labels.csv') != ''
+        uses: clavicarius/ci-platform/actions/maintenance-label-management@v1
+        with:
+          csv-file: .github/gh-labels.csv
+          github-token: ${{ github.token }}

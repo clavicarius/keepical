@@ -1,7 +1,6 @@
-/// <reference types="vitest" />
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 // For GitHub Pages the site is served from https://<user>.github.io/keepical/
 // so the base path must match the repository name. Override via VITE_BASE if the

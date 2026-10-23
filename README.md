@@ -68,6 +68,8 @@ If either step fails, the commit is aborted. Emergency exit: `git commit --no-ve
 Public documentation is the single source of truth under https://github.com/clavicarius/keepical/wiki
 The GitHub Wiki is synchronized only from `docs/wiki/**` via the workflow in [`.github/workflows/wiki.yml`](.github/workflows/wiki.yml).
 
+Documentation is mandatory: every change must update the docs in the same pull request (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 Internal or non-public notes belong in [`docs/internal/`](docs/internal/README.md), including the archived plan and local setup notes. 
 
 

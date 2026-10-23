@@ -62,7 +62,7 @@ describe("workflow configuration", () => {
     expect(labelsWorkflow).toContain("issues: write");
     expect(labelsWorkflow).toContain("csv-file: .github/gh-labels.csv");
     expect(labelsWorkflow).toContain("github-token: ${{ github.token }}");
-    expect(labelsCsv.split(/\r?\n/)).toHaveLength(15);
+    expect(labelsCsv.trimEnd().split(/\r?\n/)).toHaveLength(16);
     expect(labelsCsv).toContain("category;name;color;description");
     expect(labelsCsv).toContain('Priority;priority: high;D73A4A;"🔴 High priority – should be addressed soon."');
   });
